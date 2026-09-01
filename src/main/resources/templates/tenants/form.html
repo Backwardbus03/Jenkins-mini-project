@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Tenant - Rent Reminder Portal</title>
+</head>
+<body>
+    <h1>Add New Tenant</h1>
+    <form th:action="@{/tenants}" th:object="${tenant}" method="post">
+        <div>
+            <label>Name:</label>
+            <input type="text" th:field="*{name}" required />
+        </div>
+        <div>
+            <label>Email:</label>
+            <input type="email" th:field="*{email}" required />
+        </div>
+        <div>
+            <label>Phone:</label>
+            <input type="text" th:field="*{phone}" />
+        </div>
+        <div>
+            <label>Apartment Number:</label>
+            <input type="text" th:field="*{apartmentNumber}" required />
+        </div>
+        <button type="submit">Save</button>
+    </form>
+    <a th:href="@{/tenants}">Back to List</a>
+</body>
+</html>
