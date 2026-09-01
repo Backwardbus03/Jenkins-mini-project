@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment Receipts - Rent Reminder Portal</title>
+    <style>
+        @media print {
+            .no-print { display: none; }
+            .receipt { page-break-after: always; }
+        }
+        .receipt {
+            border: 1px solid #000;
+            padding: 20px;
+            margin-bottom: 20px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">Print Receipts</button>
+        <a th:href="@{/payments/summary}">Back to Summary</a>
+    </div>
+    
+    <div th:each="payment : ${payments}" class="receipt">
+        <h2>Rent Receipt</h2>
+        <p><strong>Receipt ID:</strong> <span th:text="${payment.id}"></span></p>
+        <p><strong>Tenant:</strong> <span th:text="${payment.tenant.name}"></span></p>
+        <p><strong>Apartment:</strong> <span th:text="${payment.tenant.apartmentNumber}"></span></p>
+        <p><strong>Amount:</strong> $<span th:text="${payment.amount}"></span></p>
+        <p><strong>Date:</strong> <span th:text="${payment.date}"></span></p>
+        <p><strong>For Month/Year:</strong> <span th:text="${payment.month}"></span>/<span th:text="${payment.year}"></span></p>
+        <p><strong>Status:</strong> <span th:text="${payment.status}"></span></p>
+    </div>
+</body>
+</html>
