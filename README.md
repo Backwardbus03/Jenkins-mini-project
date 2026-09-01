@@ -1,8 +1,5 @@
 # Rent Payment Reminder Portal
 
-DevOps mini-project — BE CMPN, Div B, Batch-1
-Student: Sumedh Hadkar (23102B0050)
-
 ## 1. Problem Statement & Scope (Week 1)
 
 Many tenants and small landlords track rent manually (WhatsApp, notebooks,
