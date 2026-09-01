@@ -5,11 +5,11 @@
 | ID | User Story | Priority |
 |---|---|---|
 | US-1 | As a landlord, I can create an account/login so my data is private | High |
-| US-2 | As a landlord, I can add a tenant with room and monthly rent | High |
-| US-3 | As a landlord, I can record a rent payment for a tenant | High |
-| US-4 | As the system, I validate payment entries (no negative/duplicate amounts) | High |
-| US-5 | As a landlord, I can view a summary of who has paid / is overdue | High |
-| US-6 | As a landlord, I can download a receipt/status for a payment | Medium |
+| US-2 | As a landlord, I can add a tenant with room and monthly rent | High (Done) |
+| US-3 | As a landlord, I can record a rent payment for a tenant | High (Done) |
+| US-4 | As the system, I validate payment entries (no negative/duplicate amounts) | High (Done) |
+| US-5 | As a landlord, I can view a summary of who has paid / is overdue | High (Done) |
+| US-6 | As a landlord, I can download a receipt/status for a payment | Medium (Done) |
 | US-7 | As a landlord, I can edit or remove a tenant record | Medium |
 | US-8 | As a landlord, I get a reminder list of upcoming due dates | Low (stretch) |
 
