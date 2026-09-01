@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.validation.Valid;
+import org.springframework.validation.BindingResult;
 
 @Controller
 @RequestMapping("/tenants")
@@ -32,7 +34,10 @@ public class TenantController {
     }
 
     @PostMapping
-    public String saveTenant(@ModelAttribute("tenant") Tenant tenant) {
+    public String saveTenant(@Valid @ModelAttribute("tenant") Tenant tenant, BindingResult bindingResult) {
+        if (bindingResult.hasErrors()) {
+            return "tenants/form";
+        }
         tenantService.saveTenant(tenant);
         return "redirect:/tenants";
     }
