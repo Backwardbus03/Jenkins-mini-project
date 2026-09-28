@@ -114,7 +114,7 @@
                                 </th:block>
                             </td>
                             <td>
-                                <a th:href="@{/payments/new}" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+ Add Payment</a>
+                                <a th:href="@{/payments/new(tenantId=${tenant.id})}" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+ Add Payment</a>
                             </td>
                         </tr>
                     </tbody>

@@ -40,8 +40,12 @@ public class PaymentController {
     }
 
     @GetMapping({"/new", "/form", "/add"})
-    public String showPaymentForm(Model model) {
-        model.addAttribute("payment", new Payment());
+    public String showPaymentForm(@RequestParam(value = "tenantId", required = false) Long tenantId, Model model) {
+        Payment payment = new Payment();
+        if (tenantId != null) {
+            tenantService.findById(tenantId).ifPresent(payment::setTenant);
+        }
+        model.addAttribute("payment", payment);
         model.addAttribute("tenants", tenantInvitationService.filterActiveTenants(tenantService.getAllTenants()));
         return "payments/form";
     }
