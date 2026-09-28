@@ -1,31 +1,197 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Tenants - Rent Reminder Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenants — Rent Reminder Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
 <body>
-    <h1>Tenants</h1>
-    <a th:href="@{/tenants/new}">Add New Tenant</a>
-    <table border="1">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Apartment Number</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="tenant : ${tenants}">
-                <td th:text="${tenant.id}">1</td>
-                <td th:text="${tenant.name}">John Doe</td>
-                <td th:text="${tenant.email}">john@example.com</td>
-                <td th:text="${tenant.phone}">555-1234</td>
-                <td th:text="${tenant.apartmentNumber}">101</td>
-            </tr>
-        </tbody>
-    </table>
+<nav class="navbar">
+    <a class="navbar-brand" th:href="@{/tenants}">🏠 RentPortal <span style="font-size:0.7rem; opacity:0.7;">Owner</span></a>
+    <div class="navbar-links">
+        <a th:href="@{/tenants}">Tenants</a>
+        <a th:href="@{/payments/new}">Add Payment</a>
+        <a th:href="@{/payments/summary}">Summary</a>
+        <form th:action="@{/logout}" method="post" style="display:inline;">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn btn-sm btn-logout" style="background:none; cursor:pointer;">Sign Out</button>
+        </form>
+    </div>
+</nav>
+
+<div class="page-container">
+    <div class="page-header flex-between">
+        <div>
+            <h1 class="page-title">Tenants Directory</h1>
+            <p class="page-subtitle">Manage active leases, track portal approvals, and view past expired tenancies</p>
+        </div>
+        <a id="btn-add-tenant" th:href="@{/tenants/new}" class="btn btn-primary">+ Add Tenant</a>
+    </div>
+
+    <!-- Tabs Header -->
+    <div class="tab-nav">
+        <button id="btn-tab-active" class="tab-btn active" onclick="switchTab('active')">
+            <span>Active Tenants</span>
+            <span class="tab-badge" th:text="${#lists.size(activeTenants)}">0</span>
+        </button>
+        <button id="btn-tab-expired" class="tab-btn" onclick="switchTab('expired')">
+            <span>Inactive / Past Tenants</span>
+            <span class="tab-badge" th:text="${#lists.size(expiredTenants)}">0</span>
+        </button>
+    </div>
+
+    <!-- ══ TAB 1: ACTIVE TENANTS ═══════════════════════════════════════ -->
+    <div id="pane-active" class="tab-pane active">
+        <div class="card">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Apartment</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Portal Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:if="${#lists.isEmpty(activeTenants)}">
+                            <td colspan="7">
+                                <div class="empty-state" style="padding:2.5rem;">
+                                    <div class="icon">🏠</div>
+                                    <p>No active tenants currently. <a th:href="@{/tenants/new}" style="color:var(--accent-light);">Add a new tenant →</a></p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:each="tenant : ${activeTenants}">
+                            <td class="text-muted" th:text="${tenant.id}">1</td>
+                            <td style="font-weight:600;" th:text="${tenant.name}">John Doe</td>
+                            <td><span class="badge badge-approved" th:text="'Apt ' + ${tenant.apartmentNumber}">Apt 101</span></td>
+                            <td th:text="${tenant.email}">john@example.com</td>
+                            <td th:text="${tenant.phone ?: '—'}">555-1234</td>
+                            <td>
+                                <th:block th:with="inv=${invitationsMap != null ? invitationsMap[tenant.id] : null}">
+                                    <!-- Accepted & Active -->
+                                    <div th:if="${inv != null and inv.status == 'APPROVED'}">
+                                        <span class="badge badge-approved" style="display:inline-flex; align-items:center; gap:0.3rem;">
+                                            ✓ Accepted
+                                        </span>
+                                        <div th:if="${inv.depositBalance != null}" style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.25rem;">
+                                            Deposit: <strong style="color:var(--text-primary);" th:text="'₹' + ${#numbers.formatDecimal(inv.depositBalance, 1, 0)}">₹25,000</strong>
+                                        </div>
+                                        <div th:if="${inv.rentalStartDate != null}" style="font-size:0.7rem; color:var(--text-muted); margin-top:0.15rem;"
+                                             th:text="${inv.rentalStartDate + ' to ' + inv.rentalEndDate}">
+                                            2024-01-01 to 2025-01-01
+                                        </div>
+                                    </div>
+
+                                    <!-- Pending Approval -->
+                                    <div th:if="${inv != null and inv.status == 'PENDING'}">
+                                        <span class="badge badge-pending" style="display:inline-flex; align-items:center; gap:0.3rem;">
+                                            ⏳ Pending Approval
+                                        </span>
+                                        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
+                                            Waiting for tenant acceptance
+                                        </div>
+                                    </div>
+
+                                    <!-- Rejected -->
+                                    <div th:if="${inv != null and inv.status == 'REJECTED'}">
+                                        <span class="badge badge-rejected" style="display:inline-flex; align-items:center; gap:0.3rem;">
+                                            ✗ Rejected
+                                        </span>
+                                    </div>
+
+                                    <!-- Not Invited -->
+                                    <div th:if="${inv == null}">
+                                        <span class="badge" style="background:rgba(255,255,255,0.06); color:var(--text-muted); border:1px solid var(--border);">
+                                            Not Invited
+                                        </span>
+                                    </div>
+                                </th:block>
+                            </td>
+                            <td>
+                                <a th:href="@{/payments/new}" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+ Add Payment</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ TAB 2: INACTIVE / PAST TENANTS ═══════════════════════════════ -->
+    <div id="pane-expired" class="tab-pane">
+        <div class="card" style="border-left: 3px solid var(--text-muted);">
+            <div style="margin-bottom:1rem; font-size:0.85rem; color:var(--text-secondary);">
+                📁 <strong>Historical Records:</strong> These tenants had approved rental stays that have now concluded. Their payment history and receipts remain permanently preserved. New rent payments cannot be recorded for expired leases.
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Apartment</th>
+                            <th>Email</th>
+                            <th>Lease Period</th>
+                            <th>Final Deposit Balance</th>
+                            <th>Status</th>
+                            <th>Payment Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:if="${#lists.isEmpty(expiredTenants)}">
+                            <td colspan="8">
+                                <div class="empty-state" style="padding:2.5rem;">
+                                    <div class="icon">📁</div>
+                                    <p>No past or expired tenants yet. All tenants are currently active or pending.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:each="tenant : ${expiredTenants}">
+                            <td class="text-muted" th:text="${tenant.id}">1</td>
+                            <td style="font-weight:600;" th:text="${tenant.name}">Jane Doe</td>
+                            <td><span class="badge" style="background:rgba(255,255,255,0.06); color:var(--text-muted);" th:text="'Apt ' + ${tenant.apartmentNumber}">Apt 101</span></td>
+                            <td th:text="${tenant.email}">jane@example.com</td>
+                            <td style="font-size:0.85rem;"
+                                th:text="${invitationsMap[tenant.id].rentalStartDate + ' → ' + invitationsMap[tenant.id].rentalEndDate}">
+                                2023-01-01 → 2024-01-01
+                            </td>
+                            <td style="font-size:0.85rem; font-weight:600;"
+                                th:text="'₹' + ${#numbers.formatDecimal(invitationsMap[tenant.id].depositBalance ?: 0, 1, 2)}">
+                                ₹0.00
+                            </td>
+                            <td>
+                                <span class="badge badge-expired" style="display:inline-flex; align-items:center; gap:0.3rem;">
+                                    ⏰ Expired / Lease Ended
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge" style="background:rgba(255,255,255,0.04); color:var(--text-muted); border:1px solid rgba(255,255,255,0.08); font-size:0.7rem;"
+                                      title="Cannot record new payments for an expired lease">
+                                    Lease Concluded
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById('btn-tab-' + tabName).classList.add('active');
+    document.getElementById('pane-' + tabName).classList.add('active');
+}
+</script>
 </body>
 </html>

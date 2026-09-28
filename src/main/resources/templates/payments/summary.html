@@ -1,36 +1,81 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Payment Summary - Rent Reminder Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Summary — Rent Reminder Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
 <body>
-    <h1>Payment Summary</h1>
-    <a th:href="@{/payments/new}">Add New Payment</a> | <a th:href="@{/payments/receipt}">Print Receipts</a>
-    <table border="1">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Tenant</th>
-                <th>Amount</th>
-                <th>Date</th>
-                <th>Month</th>
-                <th>Year</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="payment : ${payments}">
-                <td th:text="${payment.id}">1</td>
-                <td th:text="${payment.tenant.name}">John Doe</td>
-                <td th:text="${payment.amount}">1000.0</td>
-                <td th:text="${payment.date}">2023-01-01</td>
-                <td th:text="${payment.month}">1</td>
-                <td th:text="${payment.year}">2023</td>
-                <td th:text="${payment.status}">Paid</td>
-            </tr>
-        </tbody>
-    </table>
-    <a th:href="@{/tenants}">Manage Tenants</a>
+<nav class="navbar">
+    <a class="navbar-brand" th:href="@{/tenants}">🏠 RentPortal <span style="font-size:0.7rem; opacity:0.7;">Owner</span></a>
+    <div class="navbar-links">
+        <a th:href="@{/tenants}">Tenants</a>
+        <a th:href="@{/payments/new}">Add Payment</a>
+        <a th:href="@{/payments/summary}">Summary</a>
+        <form th:action="@{/logout}" method="post" style="display:inline;">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn btn-sm btn-logout" style="background:none; cursor:pointer;">Sign Out</button>
+        </form>
+    </div>
+</nav>
+
+<div class="page-container">
+    <div class="page-header flex-between">
+        <div>
+            <h1 class="page-title">Payment Summary</h1>
+            <p class="page-subtitle">All recorded payments across all tenants</p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+            <a th:href="@{/payments/new}" class="btn btn-primary btn-sm">+ Add Payment</a>
+            <a th:href="@{/payments/receipt}" class="btn btn-secondary btn-sm">🖨 Print Receipts</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tenant</th>
+                        <th>Amount (₹)</th>
+                        <th>Date</th>
+                        <th>Month</th>
+                        <th>Year</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${#lists.isEmpty(payments)}">
+                        <td colspan="8">
+                            <div class="empty-state" style="padding:2rem;">
+                                <div class="icon">💳</div>
+                                <p>No payments recorded yet. <a th:href="@{/payments/new}" style="color:var(--accent-light);">Add the first one →</a></p>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr th:each="p : ${payments}">
+                        <td class="text-muted" th:text="${p.id}">1</td>
+                        <td style="font-weight:600;" th:text="${p.tenant.name}">John Doe</td>
+                        <td th:text="'₹' + ${#numbers.formatDecimal(p.amount, 1, 2)}">₹1000.00</td>
+                        <td th:text="${p.date}">2024-01-01</td>
+                        <td th:text="${p.month}">1</td>
+                        <td th:text="${p.year}">2024</td>
+                        <td>
+                            <span th:class="${'badge badge-' + #strings.toLowerCase(p.status ?: 'unknown')}"
+                                  th:text="${p.status}">Paid</span>
+                        </td>
+                        <td>
+                            <a th:href="@{/payments/receipt/{id}(id=${p.id})}" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem; font-size:0.75rem;">🖨 Receipt</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 </body>
 </html>
+
