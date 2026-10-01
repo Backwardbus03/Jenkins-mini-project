@@ -68,7 +68,8 @@ public class SecurityConfig {
                 Authentication authentication) -> {
             boolean isOwner = authentication.getAuthorities().stream()
                     .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER"));
-            response.sendRedirect(isOwner ? "/tenants" : "/portal/dashboard");
+            String contextPath = request.getContextPath() != null ? request.getContextPath() : "";
+            response.sendRedirect(contextPath + (isOwner ? "/tenants" : "/portal/dashboard"));
         };
     }
 }
