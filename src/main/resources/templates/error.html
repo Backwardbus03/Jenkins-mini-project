@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found — Rent Reminder Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<div class="auth-wrapper">
+    <div class="auth-card" style="text-align:center;">
+        <div style="font-size:3.5rem; margin-bottom:1rem;">🧭</div>
+        <h1 style="font-size:1.75rem; font-weight:800; margin-bottom:0.5rem; background:var(--gradient-header); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+            Page Not Found
+        </h1>
+        <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1.5rem;">
+            The page or route you are looking for does not exist or has been moved.
+        </p>
+
+        <div style="display:flex; justify-content:center; gap:0.75rem;">
+            <a th:href="@{/}" class="btn btn-primary">Return to Home</a>
+            <button onclick="window.history.back()" class="btn btn-secondary">Go Back</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

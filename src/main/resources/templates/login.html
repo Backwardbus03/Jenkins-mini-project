@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login — Rent Reminder Portal</title>
+    <title>Sign In — Rent Reminder Portal</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
 <body>
@@ -18,9 +18,9 @@
             ⚠️ Invalid email or password. Please try again.
         </div>
         <div th:if="${param.logout}" class="alert alert-success">
-            ✓ You have been logged out.
+            ✓ You have been signed out successfully.
         </div>
-        <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
 
         <form th:action="@{/login}" method="post">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -34,7 +34,7 @@
                 <input id="password" name="password" type="password" class="form-control"
                        placeholder="••••••••" required>
             </div>
-            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
+            <button id="btn-login" type="submit" class="btn btn-primary w-full" style="justify-content:center; margin-top:0.5rem;">
                 Sign In →
             </button>
         </form>
@@ -42,15 +42,14 @@
         <div class="auth-divider">or</div>
 
         <div class="auth-footer">
-            Are you a tenant?
+            New tenant?
             <a th:href="@{/portal/register}">Create a tenant account</a>
         </div>
 
-        <div class="alert alert-info mt-2" style="font-size:0.78rem; margin-top:1rem;">
-            <span>🔑 Default owner login: <strong>owner@rentportal.com</strong> / <strong>owner123</strong></span>
+        <div class="alert alert-info" style="font-size:0.78rem; margin-top:1.25rem;">
+            🔑 Default owner login: <strong>owner@rentportal.com</strong> / <strong>owner123</strong>
         </div>
     </div>
 </div>
 </body>
 </html>
-

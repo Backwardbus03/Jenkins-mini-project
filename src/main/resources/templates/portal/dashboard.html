@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Dashboard — Rent Reminder Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <a class="navbar-brand" th:href="@{/portal/dashboard}">🏠 RentPortal</a>
+    <div class="navbar-links">
+        <span style="color: var(--text-secondary); font-size:0.85rem;">
+            Welcome, <strong th:text="${account.name}">Tenant</strong>
+        </span>
+        <form th:action="@{/logout}" method="post" style="display:inline;">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn btn-sm btn-logout" style="background:none; cursor:pointer;">Sign Out</button>
+        </form>
+    </div>
+</nav>
+
+<div class="page-container">
+
+    <!-- Flash messages -->
+    <div th:if="${success}" class="alert alert-success">✓ <span th:text="${success}"></span></div>
+    <div th:if="${error}"   class="alert alert-error">⚠️ <span th:text="${error}"></span></div>
+
+    <div class="page-header">
+        <h1 class="page-title">Tenant Dashboard</h1>
+        <p class="page-subtitle">Manage your rental invitations, lease, and deposit</p>
+    </div>
+
+    <!-- ══ SECTION 1: Pending Invitations ══════════════════════════════ -->
+    <div th:if="${not #lists.isEmpty(pending)}">
+        <div class="section-title">📬 Pending Invitations</div>
+
+        <div th:each="invite : ${pending}">
+            <div class="notification-card">
+                <div class="icon">🔔</div>
+                <h3>You've been added as a tenant!</h3>
+                <p>
+                    Your home owner has invited you for apartment
+                    <strong th:text="${invite.tenant.apartmentNumber}">101</strong>.
+                    Please review and respond to this invitation.
+                    <span style="display:block; margin-top:0.25rem; font-size:0.8rem; color: var(--text-muted);">
+                        Sent on <span th:text="${invite.createdAt}"></span>
+                    </span>
+                </p>
+
+                <!-- Approve button toggles the form -->
+                <div class="flex gap-1">
+                    <button class="btn btn-success btn-sm"
+                            th:onclick="'toggleApprove(\'form-' + ${invite.id} + '\')'">
+                        ✓ Approve &amp; Set Deposit
+                    </button>
+                    <form th:action="@{/portal/invite/{id}/reject(id=${invite.id})}" method="post" style="display:inline;">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <button id="btn-reject" type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Are you sure you want to reject this invitation?')">
+                            ✗ Reject
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Inline approval form (hidden by default) -->
+                <div th:id="'form-' + ${invite.id}" class="approve-form">
+                    <form th:action="@{/portal/invite/{id}/approve(id=${invite.id})}" method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <div class="form-row" style="margin-bottom:0.75rem;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Deposit Amount (₹)</label>
+                                <input id="deposit-amount" name="depositAmount" type="number" step="0.01" min="0"
+                                       class="form-control" placeholder="e.g. 25000" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Rental Start Date</label>
+                                <input id="start-date" name="rentalStartDate" type="date" class="form-control" required>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Rental End Date</label>
+                                <input id="end-date" name="rentalEndDate" type="date" class="form-control" required>
+                            </div>
+                        </div>
+                        <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
+                            <button id="btn-confirm-approve" type="submit" class="btn btn-success btn-sm">Confirm Approval</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    th:onclick="'toggleApprove(\'form-' + ${invite.id} + '\')'">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ SECTION 2: Active Leases ════════════════════════════════════ -->
+    <div th:if="${not #lists.isEmpty(approved)}">
+        <div class="section-title" style="margin-top:2rem;">🏡 Active Leases</div>
+        <div class="card-grid">
+            <div th:each="invite : ${approved}">
+
+                <!-- Lease Card -->
+                <div class="card lease-card">
+                    <div class="card-title">
+                        <span>🏢</span>
+                        <span th:text="'Apt ' + ${invite.tenant.apartmentNumber}">Apt 101</span>
+                        <span th:if="${invite.isExpired()}" class="badge badge-expired" style="margin-left:auto;">⏰ Expired / Lease Ended</span>
+                        <span th:unless="${invite.isExpired()}" class="badge badge-approved" style="margin-left:auto;">Active</span>
+                    </div>
+                    <div class="stat-row">
+                        <div class="stat">
+                            <span class="stat-label">Tenant Name</span>
+                            <span class="stat-value" th:text="${invite.tenant.name}">Name</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Start Date</span>
+                            <span class="stat-value" th:text="${invite.rentalStartDate}">2024-01-01</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">End Date</span>
+                            <span class="stat-value" th:text="${invite.rentalEndDate}">2025-01-01</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deposit Card -->
+                <div class="card deposit-card">
+                    <div class="card-title">
+                        <span>💰</span>
+                        <span>Deposit Balance</span>
+                    </div>
+
+                    <div th:with="pct=${invite.depositAmount != null and invite.depositAmount > 0 ? (invite.depositBalance / invite.depositAmount * 100) : 0}">
+                        <div class="deposit-header">
+                            <div>
+                                <div class="stat-label">Current Balance</div>
+                                <div class="deposit-amount" th:classappend="${pct < 30 ? 'low' : ''}"
+                                     th:text="'₹' + ${#numbers.formatDecimal(invite.depositBalance ?: 0, 1, 2)}">₹0.00</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div class="stat-label">Original Deposit</div>
+                                <div style="font-size:1rem; font-weight:600;" th:text="'₹' + ${#numbers.formatDecimal(invite.depositAmount ?: 0, 1, 2)}">₹0.00</div>
+                            </div>
+                        </div>
+                        <div class="deposit-bar-bg">
+                            <div class="deposit-bar-fill" th:classappend="${pct < 30 ? 'low' : ''}"
+                                 th:style="'width: ' + ${pct} + '%;'"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted);">
+                            <span th:text="${#numbers.formatDecimal(pct, 1, 1) + '% remaining'}">100% remaining</span>
+                            <span th:if="${pct < 30}" class="text-red" style="font-weight:600;">⚠ Low balance</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ SECTION 3: Overdue / Deduction History ═══════════════════════ -->
+    <div th:if="${overduePayments != null and not #lists.isEmpty(overduePayments)}">
+        <div class="section-title" style="margin-top:2rem;">⚠️ Overdue Rent — Deposit Deductions</div>
+        <div class="card" style="border-left: 3px solid var(--accent-red);">
+            <p style="color:#fca5a5; font-size:0.85rem; margin-bottom:0.75rem;">
+                The owner has marked the following rental periods as overdue. These amounts have been automatically deducted from your security deposit balance.
+            </p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month / Year</th>
+                            <th>Amount Deducted (₹)</th>
+                            <th>Date Recorded</th>
+                            <th>Status</th>
+                            <th>Receipt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="p : ${overduePayments}">
+                            <td th:text="${p.month + ' / ' + p.year}">1 / 2024</td>
+                            <td class="text-red" style="font-weight:700;" th:text="'−₹' + ${#numbers.formatDecimal(p.amount, 1, 2)}">−₹5000.00</td>
+                            <td th:text="${p.date}">2024-01-15</td>
+                            <td><span class="badge badge-overdue">Overdue</span></td>
+                            <td>
+                                <a th:href="@{/portal/receipt/{id}(id=${p.id})}" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem; font-size:0.75rem;">🖨 View Receipt</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ SECTION 4: All Payment Records & Receipts ════════════════════ -->
+    <div th:if="${allPayments != null and not #lists.isEmpty(allPayments)}">
+        <div class="section-title flex-between" style="margin-top:2rem;">
+            <span>💳 Payment Records &amp; Receipts</span>
+            <a th:href="@{/portal/receipts}" class="btn btn-secondary btn-sm">🖨 Print All Receipts</a>
+        </div>
+        <div class="card">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Rental Period</th>
+                            <th>Amount (₹)</th>
+                            <th>Payment Date</th>
+                            <th>Status</th>
+                            <th>Receipt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="p : ${allPayments}">
+                            <td class="text-muted" th:text="${p.id}">1</td>
+                            <td style="font-weight:600;" th:text="${'Month ' + p.month + ', ' + p.year}">Month 1, 2024</td>
+                            <td th:text="'₹' + ${#numbers.formatDecimal(p.amount, 1, 2)}">₹15000.00</td>
+                            <td th:text="${p.date}">2024-01-15</td>
+                            <td>
+                                <span th:class="${'badge badge-' + #strings.toLowerCase(p.status ?: 'unknown')}"
+                                      th:text="${p.status}">Paid</span>
+                            </td>
+                            <td>
+                                <a th:href="@{/portal/receipt/{id}(id=${p.id})}" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem; font-size:0.75rem;">🖨 View Receipt</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ Empty State (no invitations at all) ══════════════════════════ -->
+    <div th:if="${#lists.isEmpty(pending) and #lists.isEmpty(approved)}">
+        <div class="card" style="margin-top:1rem;">
+            <div class="empty-state">
+                <div class="icon">📭</div>
+                <h3 style="margin-bottom:0.5rem; color: var(--text-secondary);">No invitations yet</h3>
+                <p>Your home owner will send you an invitation once they add you as a tenant.<br>
+                   Make sure they have your email: <strong th:text="${account.email}">email</strong></p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function toggleApprove(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle('open');
+}
+</script>
+</body>
+</html>

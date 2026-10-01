@@ -5,6 +5,7 @@ import com.rentreminder.app.repository.TenantRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class TenantService {
@@ -22,4 +23,13 @@ public class TenantService {
     public Tenant saveTenant(Tenant tenant) {
         return tenantRepository.save(tenant);
     }
+
+    public Optional<Tenant> findById(Long id) {
+        return tenantRepository.findById(id);
+    }
+
+    public Optional<Tenant> findByEmail(String email) {
+        return tenantRepository.findByEmail(email);
+    }
 }
+
