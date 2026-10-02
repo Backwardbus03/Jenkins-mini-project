@@ -17,6 +17,8 @@ Jenkins-based DevOps project for a Rent Payment Reminder Portal (Batch-1, BE CMP
 - [Week 9: Selenium Automated Testing](file:///c:/Users/sumed/IdeaProjects/rent-reminder-portal/docs/week9-selenium-testing.md)
 - [Week 10: Continuous Testing in Jenkins](file:///c:/Users/sumed/IdeaProjects/rent-reminder-portal/docs/week10-continuous-testing.md)
 - [Week 11: Docker Image and Container Lifecycle](file:///c:/Users/sumed/IdeaProjects/rent-reminder-portal/docs/week11-docker-container-lifecycle.md)
+- [Jenkins Docker Integration: Automated CI/CD Pipeline](file:///c:/Users/sumed/IdeaProjects/rent-reminder-portal/docs/jenkins-docker-integration.md)
+
 
 ## Quick Start with Docker
 ```bash

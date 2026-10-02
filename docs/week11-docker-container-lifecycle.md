@@ -253,47 +253,12 @@ docker rmi rent-reminder-portal:1.0
 
 ---
 
-## 5. Jenkins Automated CI/CD Pipeline Integration
-
-The `Jenkinsfile` at the repository root automates the entire Continuous Testing and Container Deployment lifecycle:
-
-```
-+--------------------------------------------------------------------------------------------------------+
-|                                    Jenkins CI/CD Pipeline Lifecycle                                    |
-|                                                                                                        |
-|  [Checkout] --> [Compile] --> [Test (Selenium Quality Gate)] --> [Package WAR]                         |
-|                                                                      |                                 |
-|         +------------------------------------------------------------+                                 |
-|         v                                                                                              |
-|  [Docker Build & Tag] (rent-reminder-portal:${BUILD_NUMBER} + :latest)                                 |
-|         |                                                                                              |
-|         v                                                                                              |
-|  [Docker Publish] (Optional: Docker Hub / Local Registry)                                              |
-|         |                                                                                              |
-|         v                                                                                              |
-|  [Docker Deploy] (Gracefully stop old container -> Run fresh container on :8081 -> Healthcheck)        |
-+--------------------------------------------------------------------------------------------------------+
-```
-
-### Key Stages in `Jenkinsfile`
-1. **Quality Gate (`Test`)**: Executes `mvn test` (Selenium regression suite). If any test fails, deployment halts immediately.
-2. **Packaging (`Package`)**: Runs `mvn package -DskipTests` to generate `target/rent-reminder-portal.war`.
-3. **Build & Tag (`Docker Build & Tag`)**: Tags the Docker image with the unique Jenkins `${BUILD_NUMBER}` (e.g., `rent-reminder-portal:12`) and `latest`.
-4. **Publish (`Docker Publish`)**: When `PUSH_TO_REGISTRY` is enabled, pushes versioned and `latest` tags to Docker Hub (with Jenkins credentials) or a private registry.
-5. **Fresh Deployment (`Docker Deploy`)**:
-   - Gracefully stops and removes any existing `rent-portal-app` container.
-   - Spins up a brand new container bound to host port `8081` with persistent SQLite volume (`rent_data:/app/data`).
-   - Verifies container health via HTTP status probe.
-
----
-
-## 6. Deliverable Checklist
+## 5. Deliverable Checklist
 - [x] Multi-stage `Dockerfile` created at repository root (`maven:3.9.6` builder + `eclipse-temurin:17-jre-jammy` runtime).
 - [x] Fast local build `Dockerfile.local` created for instant build workflows.
 - [x] `.dockerignore` configured to exclude unnecessary build artifacts, git history, and temporary files.
 - [x] Port mapping documented (`-p 8081:8081`).
 - [x] Persistence directory `/app/data` configured for SQLite database (`rentdb.sqlite`).
 - [x] Container lifecycle commands documented: build, tag, run, logs, stop, restart, pause, unpause, and remove.
-- [x] `Jenkinsfile` extended with `Docker Build & Tag`, `Docker Publish`, and `Docker Deploy` stages.
-- [x] `docs/week11-docker-container-lifecycle.md` created with architectural diagram, command matrix, and Jenkins pipeline documentation.
+- [x] `docs/week11-docker-container-lifecycle.md` created with architectural diagram and command matrix.
 
