@@ -25,6 +25,11 @@ import java.time.Duration;
 @ExtendWith(ScreenshotWatcher.class)
 public abstract class BaseSeleniumTest {
 
+    static {
+        System.setProperty("webdriver.chrome.silentOutput", "true");
+        java.util.logging.Logger.getLogger("org.openqa.selenium").setLevel(java.util.logging.Level.SEVERE);
+    }
+
     @LocalServerPort
     protected int port;
 
