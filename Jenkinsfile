@@ -159,7 +159,8 @@ pipeline {
                     echo Inspecting recent container logs:
                     docker logs --tail 25 %CONTAINER_NAME%
                     echo Checking container HTTP accessibility:
-                    curl -s -o nul -w "HTTP Response Code: %%{http_code}\n" http://localhost:%HOST_PORT%/login || echo Waiting for container to finish initialization...
+                    curl -I http://localhost:%HOST_PORT%/login
+                    ver >nul
                 '''
             }
         }
