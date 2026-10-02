@@ -1,0 +1,12 @@
+**/.git
+**/.github
+**/.idea
+**/*.iml
+target/classes
+target/generated-sources
+target/maven-status
+target/surefire-reports
+*.log
+*.sqlite
+.DS_Store
+Thumbs.db
