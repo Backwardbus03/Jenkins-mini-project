@@ -1,0 +1,21 @@
+---
+# Provision the node (packages, users, folders, config, service) and deploy a release.
+#   ansible-playbook site.yml                              # deploy release_version from group_vars
+#   ansible-playbook site.yml -e release_version=1.0.1     # deploy another release
+- name: Provision and deploy Rent Payment Reminder Portal
+  hosts: rent_portal
+  become: true
+  any_errors_fatal: true
+  roles:
+    - prerequisites
+    - portal_release
+
+  post_tasks:
+    - name: Show live release
+      ansible.builtin.command: readlink -f {{ app_current_link }}
+      register: live_release
+      changed_when: false
+
+    - name: Deployment summary
+      ansible.builtin.debug:
+        msg: "Live release: {{ live_release.stdout }} | URL: http://{{ ansible_host }}:{{ app_port }}/login"

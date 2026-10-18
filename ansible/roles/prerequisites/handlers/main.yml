@@ -1,0 +1,13 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+# Triggered by unit / env / release-symlink changes. In the site play the release role
+# flushes handlers only after the artifact + `current` symlink exist, so this never
+# tries to start the service without an application.
+- name: Restart rent-portal
+  ansible.builtin.systemd:
+    name: "{{ app_service_name }}"
+    state: restarted
+    enabled: true

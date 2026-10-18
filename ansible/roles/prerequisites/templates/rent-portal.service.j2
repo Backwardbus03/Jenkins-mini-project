@@ -1,0 +1,27 @@
+# Managed by Ansible
+[Unit]
+Description=Rent Payment Reminder Portal (Spring Boot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_data_dir }}
+EnvironmentFile={{ app_env_file }}
+ExecStart=/bin/sh -c 'exec /usr/bin/java ${JAVA_OPTS} -Dserver.port=${SERVER_PORT} -Dspring.datasource.url=${SPRING_DATASOURCE_URL} -Dorg.sqlite.tmpdir={{ app_data_dir }} -Dlogging.file.name={{ app_log_dir }}/app.log -jar {{ app_current_link }}/app.war'
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+LimitNOFILE=65536
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths={{ app_data_dir }} {{ app_log_dir }}
+
+[Install]
+WantedBy=multi-user.target

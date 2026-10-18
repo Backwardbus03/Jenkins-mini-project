@@ -1,0 +1,19 @@
+---
+# Health check: HTTP 200 on the public /login page (same probe as the Dockerfile
+# HEALTHCHECK and the Jenkins "Docker Deploy" stage). Retries cover JVM start-up time.
+- name: Wait for application port {{ app_port }}
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ app_port }}"
+    timeout: "{{ (health_retries | int) * (health_delay | int) }}"
+
+- name: HTTP health probe {{ health_url }}
+  ansible.builtin.uri:
+    url: "{{ health_url }}"
+    status_code: 200
+    return_content: false
+  register: health_probe
+  retries: "{{ health_retries | int }}"
+  delay: "{{ health_delay | int }}"
+  until: health_probe.status is defined and health_probe.status == 200
+  changed_when: false

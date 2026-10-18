@@ -26,3 +26,7 @@ application-local.properties
 
 # Docker
 docker-compose.override.yml
+
+# Ansible lab artifacts/logs
+ansible/artifacts/
+ansible/logs/*.tmp

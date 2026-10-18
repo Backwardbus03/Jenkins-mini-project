@@ -1,0 +1,21 @@
+# Target node: a clean Ubuntu 22.04 "server" with systemd + SSH + Python (the minimum Ansible
+# needs). NOTHING application-specific is installed here - no Java, no app user, no folders.
+# Everything the portal needs must be provided by the Ansible playbooks.
+FROM jrei/systemd-ubuntu:22.04
+
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      openssh-server python3 sudo procps iproute2 \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /run/sshd \
+ && sed -i '/pam_nologin/d' /etc/pam.d/sshd \
+ && systemctl enable ssh
+
+# Management user used by Ansible (key-based SSH + passwordless sudo)
+RUN useradd -m -s /bin/bash ansible \
+ && echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible \
+ && chmod 0440 /etc/sudoers.d/ansible \
+ && mkdir -p /home/ansible/.ssh && chmod 700 /home/ansible/.ssh \
+ && chown ansible:ansible /home/ansible/.ssh
+
+EXPOSE 22 8081

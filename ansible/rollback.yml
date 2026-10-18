@@ -1,0 +1,68 @@
+---
+# Manual rollback / recovery: switch `current` back to the previous stable release
+# (or to an explicit one with -e rollback_to=1.0.0), restart and re-verify health.
+- name: Roll back Rent Payment Reminder Portal
+  hosts: rent_portal
+  become: true
+  tasks:
+    - name: Read release pointers
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ app_current_link }}"
+        - "{{ app_previous_link }}"
+      register: pointers
+
+    - name: Work out rollback target
+      ansible.builtin.set_fact:
+        from_release: "{{ pointers.results[0].stat.lnk_source | default('') }}"
+        to_release: >-
+          {{ (app_releases_dir ~ '/' ~ rollback_to) if rollback_to is defined
+             else (pointers.results[1].stat.lnk_source | default('')) }}
+
+    - name: Ensure rollback target exists
+      ansible.builtin.stat:
+        path: "{{ to_release }}/app.war"
+      register: target_war
+
+    - name: Abort when there is nothing to roll back to
+      ansible.builtin.assert:
+        that:
+          - to_release | length > 0
+          - target_war.stat.exists
+          - to_release != from_release
+        fail_msg: "No valid rollback target (from={{ from_release }}, to={{ to_release }})"
+        quiet: true
+
+    - name: "Switch `current` to {{ to_release }}"
+      ansible.builtin.file:
+        src: "{{ to_release }}"
+        dest: "{{ app_current_link }}"
+        state: link
+        force: true
+        owner: root
+        group: "{{ app_group }}"
+
+    - name: Keep the rolled-back-from release as `previous` (allows roll-forward)
+      ansible.builtin.file:
+        src: "{{ from_release }}"
+        dest: "{{ app_previous_link }}"
+        state: link
+        force: true
+        owner: root
+        group: "{{ app_group }}"
+      when: from_release | length > 0
+
+    - name: Restart service on rolled-back release
+      ansible.builtin.systemd:
+        name: "{{ app_service_name }}"
+        state: restarted
+
+    - name: Verify health after rollback
+      ansible.builtin.include_role:
+        name: portal_release
+        tasks_from: healthcheck.yml
+
+    - name: Rollback summary
+      ansible.builtin.debug:
+        msg: "Rolled back {{ from_release }} -> {{ to_release }} and health check passed"

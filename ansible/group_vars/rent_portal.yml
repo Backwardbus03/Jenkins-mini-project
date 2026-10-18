@@ -1,0 +1,48 @@
+---
+# ---- Application identity -------------------------------------------------
+app_name: rent-portal
+app_user: rentportal
+app_group: rentportal
+
+# ---- Network --------------------------------------------------------------
+app_port: 8081          # server.port in application.properties
+ssh_port: 22
+
+# ---- Filesystem layout ----------------------------------------------------
+app_root: /opt/rent-portal              # releases/<version>/app.war + current/previous symlinks
+app_releases_dir: "{{ app_root }}/releases"
+app_current_link: "{{ app_root }}/current"
+app_previous_link: "{{ app_root }}/previous"
+app_data_dir: /var/lib/rent-portal/data # SQLite DB - lives OUTSIDE releases so it survives deploys/rollbacks
+app_log_dir: /var/log/rent-portal
+app_conf_dir: /etc/rent-portal
+app_env_file: "{{ app_conf_dir }}/rent-portal.env"
+app_service_name: rent-portal
+
+# ---- Runtime --------------------------------------------------------------
+app_java_opts: "-Xms256m -Xmx512m -XX:+UseG1GC"   # same as Dockerfile
+app_datasource_url: "jdbc:sqlite:{{ app_data_dir }}/rentdb.sqlite"
+
+# ---- Release / artifact ---------------------------------------------------
+# Path on the *control* node (mounted into the Ansible container) of the WAR produced
+# by `mvn package` / Jenkins. Override per run: -e artifact_src=/path/app.war
+artifact_src: /ansible/artifacts/rent-reminder-portal.war
+release_version: "1.0.0"
+releases_to_keep: 3
+
+# ---- Health check ---------------------------------------------------------
+health_url: "http://127.0.0.1:{{ app_port }}/login"   # public page, returns 200 when app is up
+health_retries: 24
+health_delay: 5
+
+# ---- OS packages ----------------------------------------------------------
+base_packages:
+  - openjdk-17-jre-headless   # Spring Boot 3.2 requires Java 17+
+  - curl                      # health checks / diagnostics
+  - ca-certificates
+  - sqlite3                   # inspect the SQLite DB
+  - logrotate                 # rotate /var/log/rent-portal/*.log
+
+# Host firewall (ufw). Disabled in the container lab because containers share the
+# host kernel netfilter; set true on a real VM/server.
+manage_firewall: false

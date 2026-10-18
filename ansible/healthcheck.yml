@@ -1,0 +1,66 @@
+---
+# Read-only post-deployment verification. Safe to run any time.
+- name: Verify Rent Payment Reminder Portal health
+  hosts: rent_portal
+  become: true
+  tasks:
+    - name: systemd service is active
+      ansible.builtin.command: systemctl is-active {{ app_service_name }}
+      register: svc
+      changed_when: false
+
+    - name: Service is enabled at boot
+      ansible.builtin.command: systemctl is-enabled {{ app_service_name }}
+      register: svc_enabled
+      changed_when: false
+
+    - name: HTTP health probe (port + /login = 200)
+      ansible.builtin.include_role:
+        name: portal_release
+        tasks_from: healthcheck.yml
+
+    - name: Protected page redirects anonymous users to /login (security filter active)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ app_port }}/tenants"
+        follow_redirects: none
+        status_code: 302
+        return_content: false
+      register: protected
+      changed_when: false
+
+    - name: SQLite database exists on persistent path
+      ansible.builtin.stat:
+        path: "{{ app_data_dir }}/rentdb.sqlite"
+      register: db
+
+    - name: Process runs as the service account
+      ansible.builtin.command: ps -o user= -C java
+      register: proc_user
+      changed_when: false
+
+    - name: Live release
+      ansible.builtin.command: readlink -f {{ app_current_link }}
+      register: live
+      changed_when: false
+
+    - name: Assert everything is healthy
+      ansible.builtin.assert:
+        that:
+          - svc.stdout == 'active'
+          - svc_enabled.stdout == 'enabled'
+          - health_probe.status == 200
+          - protected.status == 302
+          - db.stat.exists
+          - app_user in proc_user.stdout
+        quiet: true
+
+    - name: Health report
+      ansible.builtin.debug:
+        msg:
+          - "service        : {{ svc.stdout }} / {{ svc_enabled.stdout }}"
+          - "GET /login     : HTTP {{ health_probe.status }}"
+          - "GET /tenants   : HTTP {{ protected.status }} -> {{ protected.location | default('n/a') }} (anonymous redirected)"
+          - "database       : {{ app_data_dir }}/rentdb.sqlite ({{ db.stat.size | default(0) }} bytes)"
+          - "runs as        : {{ proc_user.stdout | trim }}"
+          - "live release   : {{ live.stdout }}"
+          - "RESULT         : HEALTHY"

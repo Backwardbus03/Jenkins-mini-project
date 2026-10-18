@@ -1,0 +1,137 @@
+---
+# Zero-downtime-style release layout with automatic rollback:
+#   releases/<version>/app.war   immutable per-release artifacts
+#   current  -> releases/<new>   what systemd runs
+#   previous -> releases/<old>   last known-good release (updated ONLY after health check passes)
+
+- name: Verify release artifact exists on the control node
+  ansible.builtin.stat:
+    path: "{{ artifact_src }}"
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  become: false
+  register: artifact
+  changed_when: false
+
+- name: Fail early when the artifact is missing
+  ansible.builtin.assert:
+    that: artifact.stat.exists
+    fail_msg: "Artifact {{ artifact_src }} not found - run `mvn package -DskipTests` first."
+    quiet: true
+
+- name: Inspect currently deployed release
+  ansible.builtin.stat:
+    path: "{{ app_current_link }}"
+  register: current_link
+
+- name: Remember the release that is live before this deploy
+  ansible.builtin.set_fact:
+    old_release: "{{ current_link.stat.lnk_source | default('') }}"
+    new_release: "{{ app_releases_dir }}/{{ release_version }}"
+
+- name: Deploy {{ release_version }} (with automatic rollback on failed health check)
+  block:
+    - name: Create release directory
+      ansible.builtin.file:
+        path: "{{ new_release }}"
+        state: directory
+        owner: root
+        group: "{{ app_group }}"
+        mode: "0755"
+
+    - name: Upload application WAR
+      ansible.builtin.copy:
+        src: "{{ artifact_src }}"
+        dest: "{{ new_release }}/app.war"
+        owner: root
+        group: "{{ app_group }}"
+        mode: "0644"
+      register: war_upload
+
+    - name: Point `current` at the new release
+      ansible.builtin.file:
+        src: "{{ new_release }}"
+        dest: "{{ app_current_link }}"
+        state: link
+        force: true
+        owner: root
+        group: "{{ app_group }}"
+      notify: Restart rent-portal
+
+    # Apply queued unit/env/symlink handlers now, before the health check.
+    - name: Flush handlers (daemon-reload + restart when something changed)
+      ansible.builtin.meta: flush_handlers
+
+    - name: Ensure service is enabled and running
+      ansible.builtin.systemd:
+        name: "{{ app_service_name }}"
+        enabled: true
+        state: started
+
+    - name: Health check new release
+      ansible.builtin.include_tasks: healthcheck.yml
+
+    - name: Record previous stable release
+      ansible.builtin.file:
+        src: "{{ old_release }}"
+        dest: "{{ app_previous_link }}"
+        state: link
+        force: true
+        owner: root
+        group: "{{ app_group }}"
+      when:
+        - old_release | length > 0
+        - old_release != new_release
+
+  rescue:
+    - name: "ROLLBACK - restore previous release symlink"
+      ansible.builtin.file:
+        src: "{{ old_release }}"
+        dest: "{{ app_current_link }}"
+        state: link
+        force: true
+        owner: root
+        group: "{{ app_group }}"
+      when: old_release | length > 0
+
+    - name: "ROLLBACK - restart service on previous release"
+      ansible.builtin.systemd:
+        name: "{{ app_service_name }}"
+        state: restarted
+      when: old_release | length > 0
+
+    - name: "ROLLBACK - verify previous release is healthy"
+      ansible.builtin.include_tasks: healthcheck.yml
+      when: old_release | length > 0
+
+    - name: "ROLLBACK - discard failed release directory"
+      ansible.builtin.file:
+        path: "{{ new_release }}"
+        state: absent
+      when: new_release != old_release
+
+    - name: Report rollback and fail the play
+      ansible.builtin.fail:
+        msg: >-
+          Release {{ release_version }} FAILED its health check.
+          {{ 'Rolled back to ' ~ old_release ~ ' and verified healthy.' if old_release | length > 0
+             else 'No previous release existed to roll back to.' }}
+
+- name: Find release directories
+  ansible.builtin.find:
+    paths: "{{ app_releases_dir }}"
+    file_type: directory
+  register: release_dirs
+
+- name: Inspect previous-release pointer
+  ansible.builtin.stat:
+    path: "{{ app_previous_link }}"
+  register: previous_link
+
+- name: Prune old releases (always keep current + previous, plus a few more)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ (release_dirs.files | sort(attribute='mtime', reverse=true) | map(attribute='path')
+        | reject('in', [new_release, old_release, previous_link.stat.lnk_source | default('')]) | list)[(releases_to_keep - 2):] }}
