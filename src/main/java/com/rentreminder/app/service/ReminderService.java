@@ -4,6 +4,7 @@ import com.rentreminder.app.model.Payment;
 import com.rentreminder.app.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -21,9 +22,10 @@ public class ReminderService {
 
     private final PaymentRepository paymentRepository;
     private final TenantInvitationService tenantInvitationService;
+    private final NotificationService notificationService;
     private final JavaMailSender mailSender;
 
-    @Value("${app.reminder.enabled:false}")
+    @Value("${app.reminder.enabled:true}")
     private boolean remindersEnabled;
 
     @Value("${app.portal.base-url:http://localhost:8081}")
@@ -34,15 +36,17 @@ public class ReminderService {
 
     public ReminderService(PaymentRepository paymentRepository,
                            TenantInvitationService tenantInvitationService,
-                           JavaMailSender mailSender) {
+                           NotificationService notificationService,
+                           @Autowired(required = false) JavaMailSender mailSender) {
         this.paymentRepository = paymentRepository;
         this.tenantInvitationService = tenantInvitationService;
+        this.notificationService = notificationService;
         this.mailSender = mailSender;
     }
 
     /**
      * Daily scheduled task to scan for due/overdue rent and electricity bills
-     * and dispatch reminder emails.
+     * and dispatch in-app UI notifications (and optional email if SMTP is configured).
      */
     @Scheduled(cron = "${app.reminder.cron:0 0 9 * * *}")
     public int processDueReminders() {
@@ -75,20 +79,24 @@ public class ReminderService {
                     }
                 }
 
-                boolean success = sendEmailReminder(payment, daysUntilDue);
-                if (success) {
-                    payment.setLastReminderSentOn(today);
-                    paymentRepository.save(payment);
-                    sentCount++;
-                }
+                // 1. Deliver primary in-app UI notification
+                dispatchUiNotification(payment, daysUntilDue);
+
+                // 2. Deliver secondary email reminder if SMTP is available (swallowing errors gracefully)
+                sendEmailReminderQuietly(payment, daysUntilDue);
+
+                payment.setLastReminderSentOn(today);
+                paymentRepository.save(payment);
+                sentCount++;
             }
         }
-        log.info("ReminderService dispatched {} reminder emails for today", sentCount);
+        log.info("ReminderService dispatched {} in-app UI reminders for today", sentCount);
         return sentCount;
     }
 
     /**
-     * Trigger a single reminder on-demand (e.g. for viva demonstration or manual landlord trigger).
+     * Trigger a single reminder on-demand (e.g. when landlord clicks 'Remind' in the UI).
+     * Always creates an in-app UI notification for the tenant's portal dashboard.
      */
     public boolean sendManualReminder(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
@@ -98,67 +106,117 @@ public class ReminderService {
         LocalDate dueDate = payment.getDueDate() != null ? payment.getDueDate() : today;
         long daysUntilDue = ChronoUnit.DAYS.between(today, dueDate);
 
-        boolean success = sendEmailReminder(payment, daysUntilDue);
-        if (success) {
-            payment.setLastReminderSentOn(today);
-            paymentRepository.save(payment);
-        }
-        return success;
+        // 1. Deliver primary in-app UI notification
+        dispatchUiNotification(payment, daysUntilDue);
+
+        // 2. Attempt email quietly without blocking or failing the operation
+        sendEmailReminderQuietly(payment, daysUntilDue);
+
+        payment.setLastReminderSentOn(today);
+        paymentRepository.save(payment);
+
+        return true;
     }
 
-    private boolean sendEmailReminder(Payment payment, long daysUntilDue) {
-        if (payment.getTenant() == null || payment.getTenant().getEmail() == null) {
-            log.warn("Skipping reminder for payment #{}: no tenant email found", payment.getId());
-            return false;
+    /**
+     * Creates an in-app UI notification visible to the tenant on their dashboard.
+     */
+    private void dispatchUiNotification(Payment payment, long daysUntilDue) {
+        if (payment.getTenant() == null) {
+            log.warn("Cannot create UI reminder for payment #{}: no tenant assigned", payment.getId());
+            return;
         }
 
         String billTypeLabel = payment.isElectricity() ? "Electricity Bill" : "Rent";
-        String recipient = payment.getTenant().getEmail();
-        String subject;
+        String apt = payment.getTenant().getApartmentNumber() != null ? payment.getTenant().getApartmentNumber() : "-";
+        double amount = payment.getAmount() != null ? payment.getAmount() : 0.0;
+        String dueDateStr = payment.getDueDate() != null ? payment.getDueDate().toString() : "Immediately";
 
+        String title;
+        String badgeType;
         if (daysUntilDue > 0) {
-            subject = String.format("⏰ Reminder: %s Payment Due in %d Day(s)", billTypeLabel, daysUntilDue);
+            title = String.format("⏰ %s Reminder: ₹%.2f due in %d day(s)", billTypeLabel, amount, daysUntilDue);
+            badgeType = "WARNING";
         } else if (daysUntilDue == 0) {
-            subject = String.format("🚨 Due Today: %s Payment for Apt %s", billTypeLabel, payment.getTenant().getApartmentNumber());
+            title = String.format("🚨 %s Due Today: ₹%.2f for Apt %s", billTypeLabel, amount, apt);
+            badgeType = "DANGER";
         } else {
-            subject = String.format("⚠️ OVERDUE: %s Payment for Apt %s", billTypeLabel, payment.getTenant().getApartmentNumber());
+            title = String.format("⚠️ OVERDUE: %s of ₹%.2f for Apt %s", billTypeLabel, amount, apt);
+            badgeType = "DANGER";
         }
 
-        String body = String.format(
-                "Dear %s,\n\n" +
-                "This is a reminder from Rent Reminder Portal regarding your %s for Apartment %s.\n\n" +
-                "• Billing Period: Month %d / %d\n" +
-                "• Amount Due: ₹%.2f\n" +
-                "• Due Date: %s\n" +
-                "• Status: %s\n\n" +
-                "You can scan the UPI QR code and submit your payment directly on the Tenant Portal:\n" +
-                "%s/portal/dashboard\n\n" +
-                "Thank you,\n" +
-                "Property Management",
-                payment.getTenant().getName(),
+        String message = String.format(
+                "Your %s for Apt %s (Period %d/%d) of ₹%.2f is %s (Due: %s). " +
+                "You can scan the UPI QR code directly on your dashboard to pay.",
                 billTypeLabel,
-                payment.getTenant().getApartmentNumber(),
+                apt,
                 payment.getMonth(),
                 payment.getYear(),
-                payment.getAmount() != null ? payment.getAmount() : 0.0,
-                payment.getDueDate() != null ? payment.getDueDate().toString() : "Immediately",
-                payment.getStatus(),
-                portalBaseUrl
+                amount,
+                daysUntilDue < 0 ? "OVERDUE" : (daysUntilDue == 0 ? "DUE TODAY" : "due soon"),
+                dueDateStr
         );
 
+        notificationService.notifyTenant(
+                payment.getTenant(),
+                title,
+                message,
+                badgeType,
+                "/portal/dashboard#payments",
+                payment
+        );
+
+        // If overdue, also notify the owner
+        if (daysUntilDue < 0) {
+            notificationService.notifyOwner(
+                    String.format("⚠️ Overdue Alert: %s (Apt %s) - ₹%.2f", payment.getTenant().getName(), apt, amount),
+                    String.format("%s for Apartment %s is overdue by %d days. Amount: ₹%.2f.", billTypeLabel, apt, Math.abs(daysUntilDue), amount),
+                    "DANGER",
+                    "/payments/summary",
+                    payment
+            );
+        }
+    }
+
+    private void sendEmailReminderQuietly(Payment payment, long daysUntilDue) {
+        if (mailSender == null || payment.getTenant() == null || payment.getTenant().getEmail() == null) {
+            return;
+        }
+
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(recipient);
-            message.setSubject(subject);
-            message.setText(body);
-            mailSender.send(message);
-            log.info("Sent {} reminder email to {}", billTypeLabel, recipient);
-            return true;
+            String billTypeLabel = payment.isElectricity() ? "Electricity Bill" : "Rent";
+            String recipient = payment.getTenant().getEmail();
+            String subject = daysUntilDue > 0
+                    ? String.format("⏰ Reminder: %s Payment Due in %d Day(s)", billTypeLabel, daysUntilDue)
+                    : (daysUntilDue == 0
+                    ? String.format("🚨 Due Today: %s Payment for Apt %s", billTypeLabel, payment.getTenant().getApartmentNumber())
+                    : String.format("⚠️ OVERDUE: %s Payment for Apt %s", billTypeLabel, payment.getTenant().getApartmentNumber()));
+
+            String body = String.format(
+                    "Dear %s,\n\n" +
+                    "This is a reminder regarding your %s for Apartment %s.\n" +
+                    "• Amount Due: ₹%.2f\n" +
+                    "• Due Date: %s\n" +
+                    "• Status: %s\n\n" +
+                    "View and pay via UPI QR: %s/portal/dashboard\n",
+                    payment.getTenant().getName(),
+                    billTypeLabel,
+                    payment.getTenant().getApartmentNumber(),
+                    payment.getAmount() != null ? payment.getAmount() : 0.0,
+                    payment.getDueDate() != null ? payment.getDueDate().toString() : "Immediately",
+                    payment.getStatus(),
+                    portalBaseUrl
+            );
+
+            SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(fromEmail);
+            msg.setTo(recipient);
+            msg.setSubject(subject);
+            msg.setText(body);
+            mailSender.send(msg);
+            log.info("Sent optional reminder email to {}", recipient);
         } catch (Exception e) {
-            log.error("Failed to send reminder email to {}: {}", recipient, e.getMessage());
-            // In demo / staging environments where SMTP might not be live, log gracefully
-            return false;
+            log.debug("Email reminder delivery skipped/failed: {}", e.getMessage());
         }
     }
 }

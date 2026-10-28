@@ -150,6 +150,9 @@
                             <span th:if="${#strings.equalsIgnoreCase(p.status, 'Overdue')}" class="badge badge-overdue">Overdue</span>
                             <span th:if="${#strings.equalsIgnoreCase(p.status, 'Pending')}" class="badge" style="background:rgba(148,163,184,0.15); color:#94a3b8; border:1px solid rgba(148,163,184,0.3);">Pending</span>
                             <span th:if="${#strings.equalsIgnoreCase(p.status, 'Awaiting Confirmation')}" class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);">Awaiting Verification</span>
+                            <div th:if="${p.lastReminderSentOn != null}" style="font-size:0.72rem; color:#38bdf8; margin-top:0.25rem; font-weight:600;">
+                                🔔 Reminded <span th:text="${p.lastReminderSentOn}"></span>
+                            </div>
                         </td>
                         <td>
                             <span th:if="${p.upiReference}" class="copy-chip" th:data-copy="${p.upiReference}" data-label="UPI Reference" onclick="copyToClipboard(this.getAttribute('data-copy'), this.getAttribute('data-label'))" title="Click to copy UPI Reference">
@@ -176,7 +179,7 @@
                                 <th:block th:if="${#strings.equalsIgnoreCase(p.status, 'Pending') or #strings.equalsIgnoreCase(p.status, 'Overdue')}">
                                     <form th:action="@{/payments/{id}/remind(id=${p.id})}" method="post" style="display:inline;">
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <button type="submit" class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.75rem;" title="Send email reminder now">🔔 Remind</button>
+                                        <button type="submit" class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.75rem;" title="Send in-app UI reminder to tenant dashboard">🔔 Remind</button>
                                     </form>
                                 </th:block>
 

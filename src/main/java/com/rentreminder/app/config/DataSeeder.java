@@ -8,6 +8,7 @@ import com.rentreminder.app.repository.PaymentRepository;
 import com.rentreminder.app.repository.TenantAccountRepository;
 import com.rentreminder.app.repository.TenantInvitationRepository;
 import com.rentreminder.app.repository.TenantRepository;
+import com.rentreminder.app.service.NotificationService;
 import com.rentreminder.app.service.OwnerAccountService;
 import com.rentreminder.app.service.TenantAccountService;
 import com.rentreminder.app.service.TenantInvitationService;
@@ -31,6 +32,7 @@ public class DataSeeder implements CommandLineRunner {
     private final TenantInvitationService tenantInvitationService;
     private final TenantInvitationRepository invitationRepository;
     private final PaymentRepository paymentRepository;
+    private final NotificationService notificationService;
 
     public DataSeeder(OwnerAccountService ownerAccountService,
                       TenantRepository tenantRepository,
@@ -38,7 +40,8 @@ public class DataSeeder implements CommandLineRunner {
                       TenantAccountService tenantAccountService,
                       TenantInvitationService tenantInvitationService,
                       TenantInvitationRepository invitationRepository,
-                      PaymentRepository paymentRepository) {
+                      PaymentRepository paymentRepository,
+                      NotificationService notificationService) {
         this.ownerAccountService = ownerAccountService;
         this.tenantRepository = tenantRepository;
         this.tenantAccountRepository = tenantAccountRepository;
@@ -46,26 +49,23 @@ public class DataSeeder implements CommandLineRunner {
         this.tenantInvitationService = tenantInvitationService;
         this.invitationRepository = invitationRepository;
         this.paymentRepository = paymentRepository;
+        this.notificationService = notificationService;
     }
 
     @Override
     public void run(String... args) {
-        // 1. Seed default owner
-        ownerAccountService.seedDefaultOwner(
-                "Property Owner",
-                "owner@rentportal.com",
-                "owner123",
-                "sumedhhadkar@oksbi");
+        // Ensure default owner account exists with UPI ID
+        ownerAccountService.seedDefaultOwner("Property Owner", "owner@rentportal.com", "owner123", "sumedhhadkar@oksbi");
 
-        // 2. Seed demo tenant with active lease & pending electricity bill
+        // Seed demo tenant and pending electricity bill if none exists
         String demoEmail = "tenant@rentportal.com";
         if (tenantRepository.findByEmail(demoEmail).isEmpty()) {
-            Tenant tenant = new Tenant("Rahul Sharma", demoEmail, "+91 98765 43210", "101");
+            Tenant tenant = new Tenant("Rahul Sharma", demoEmail, "9876543210", "101");
             tenant = tenantRepository.save(tenant);
 
             TenantAccount account;
             if (tenantAccountRepository.findByEmail(demoEmail).isEmpty()) {
-                account = tenantAccountService.register("Rahul Sharma", demoEmail, "+91 98765 43210", "tenant123");
+                account = tenantAccountService.register("Rahul Sharma", demoEmail, "9876543210", "tenant123");
             } else {
                 account = tenantAccountRepository.findByEmail(demoEmail).get();
             }
@@ -95,7 +95,18 @@ public class DataSeeder implements CommandLineRunner {
             elecBill.setMonth(today.getMonthValue());
             elecBill.setYear(today.getYear());
             elecBill.setStatus("Pending");
-            paymentRepository.save(elecBill);
+            elecBill = paymentRepository.save(elecBill);
+
+            // Seed in-app UI reminder notification for the tenant
+            notificationService.notifyTenant(
+                    tenant,
+                    "⚡ Electricity Bill Reminder: ₹1,800.00 due soon",
+                    String.format("Your Electricity Bill for Apt 101 (Period %d/%d) of ₹1,800.00 is due on %s. Scan your UPI QR code directly on your dashboard to complete the payment.",
+                            today.getMonthValue(), today.getYear(), today.plusDays(3)),
+                    "WARNING",
+                    "/portal/dashboard#payments",
+                    elecBill
+            );
 
             // Seed sample past rent payment
             Payment pastRent = new Payment();

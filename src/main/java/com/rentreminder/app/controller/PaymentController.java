@@ -20,15 +20,18 @@ public class PaymentController {
     private final TenantService tenantService;
     private final TenantInvitationService tenantInvitationService;
     private final com.rentreminder.app.service.ReminderService reminderService;
+    private final com.rentreminder.app.service.NotificationService notificationService;
 
     public PaymentController(PaymentService paymentService,
                              TenantService tenantService,
                              TenantInvitationService tenantInvitationService,
-                             com.rentreminder.app.service.ReminderService reminderService) {
+                             com.rentreminder.app.service.ReminderService reminderService,
+                             com.rentreminder.app.service.NotificationService notificationService) {
         this.paymentService = paymentService;
         this.tenantService = tenantService;
         this.tenantInvitationService = tenantInvitationService;
         this.reminderService = reminderService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping({"", "/"})
@@ -104,8 +107,21 @@ public class PaymentController {
     @PostMapping("/{id}/confirm")
     public String confirmPayment(@PathVariable Long id, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         try {
-            paymentService.confirmPayment(id);
-            redirectAttributes.addFlashAttribute("success", "Payment confirmed and verified.");
+            Payment payment = paymentService.confirmPayment(id);
+            if (payment != null && payment.getTenant() != null) {
+                String billLabel = payment.isElectricity() ? "Electricity Bill" : "Rent";
+                notificationService.notifyTenant(
+                        payment.getTenant(),
+                        "✓ Payment Confirmed: " + billLabel,
+                        String.format("Your %s payment of ₹%.2f (Ref: %s) has been verified and confirmed by the owner.",
+                                billLabel, payment.getAmount() != null ? payment.getAmount() : 0.0,
+                                payment.getUpiReference() != null ? payment.getUpiReference() : "-"),
+                        "SUCCESS",
+                        "/portal/dashboard#payments",
+                        payment
+                );
+            }
+            redirectAttributes.addFlashAttribute("success", "✓ Payment confirmed and verified. Notification sent to tenant.");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
@@ -115,7 +131,20 @@ public class PaymentController {
     @PostMapping("/{id}/reject")
     public String rejectPayment(@PathVariable Long id, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         try {
-            paymentService.rejectPayment(id);
+            Payment payment = paymentService.rejectPayment(id);
+            if (payment != null && payment.getTenant() != null) {
+                String billLabel = payment.isElectricity() ? "Electricity Bill" : "Rent";
+                notificationService.notifyTenant(
+                        payment.getTenant(),
+                        "⚠️ Payment Verification Failed: " + billLabel,
+                        String.format("The owner was unable to verify UPI transaction '%s' for %s (₹%.2f). Please check your transaction details and re-submit.",
+                                payment.getUpiReference() != null ? payment.getUpiReference() : "N/A",
+                                billLabel, payment.getAmount() != null ? payment.getAmount() : 0.0),
+                        "DANGER",
+                        "/portal/dashboard#payments",
+                        payment
+                );
+            }
             redirectAttributes.addFlashAttribute("error", "Payment reference rejected. Returned to Pending status.");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
@@ -127,11 +156,10 @@ public class PaymentController {
     public String sendReminder(@PathVariable Long id, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         try {
             boolean sent = reminderService.sendManualReminder(id);
-            if (sent) {
-                redirectAttributes.addFlashAttribute("success", "Reminder email sent to tenant.");
-            } else {
-                redirectAttributes.addFlashAttribute("error", "Reminder attempted, but delivery was skipped or failed (check SMTP settings).");
-            }
+            var optPayment = paymentService.findById(id);
+            String tenantName = optPayment.map(p -> p.getTenant() != null ? p.getTenant().getName() : "tenant").orElse("tenant");
+            String apt = optPayment.map(p -> p.getTenant() != null ? p.getTenant().getApartmentNumber() : "").orElse("");
+            redirectAttributes.addFlashAttribute("success", "✓ In-app UI reminder successfully delivered to " + tenantName + (apt.isEmpty() ? "" : " (Apt " + apt + ")") + ".");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }

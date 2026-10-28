@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -19,6 +18,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,6 +29,9 @@ class ReminderServiceTest {
 
     @Mock
     private TenantInvitationService tenantInvitationService;
+
+    @Mock
+    private NotificationService notificationService;
 
     @Mock
     private JavaMailSender mailSender;
@@ -52,7 +55,7 @@ class ReminderServiceTest {
 
         int sent = reminderService.processDueReminders();
         assertEquals(0, sent);
-        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+        verify(notificationService, never()).notifyTenant(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -74,7 +77,14 @@ class ReminderServiceTest {
         int sent = reminderService.processDueReminders();
 
         assertEquals(1, sent);
-        verify(mailSender, times(1)).send(any(SimpleMailMessage.class));
+        verify(notificationService, times(1)).notifyTenant(
+                eq(tenant),
+                contains("Electricity Bill Reminder"),
+                any(),
+                eq("WARNING"),
+                eq("/portal/dashboard#payments"),
+                eq(bill)
+        );
         assertEquals(today, bill.getLastReminderSentOn());
         verify(paymentRepository, times(1)).save(bill);
     }
@@ -97,11 +107,11 @@ class ReminderServiceTest {
         int sent = reminderService.processDueReminders();
 
         assertEquals(0, sent);
-        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+        verify(notificationService, never()).notifyTenant(any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    void testSendManualReminder_DispatchesEmailAndUpdatesDate() {
+    void testSendManualReminder_DispatchesUiNotificationAndUpdatesDate() {
         LocalDate today = LocalDate.now();
 
         Payment bill = new Payment();
@@ -119,7 +129,14 @@ class ReminderServiceTest {
         boolean success = reminderService.sendManualReminder(5L);
 
         assertTrue(success);
-        verify(mailSender, times(1)).send(any(SimpleMailMessage.class));
+        verify(notificationService, times(1)).notifyTenant(
+                eq(tenant),
+                contains("Rent Reminder"),
+                any(),
+                eq("WARNING"),
+                eq("/portal/dashboard#payments"),
+                eq(bill)
+        );
         assertEquals(today, bill.getLastReminderSentOn());
         verify(paymentRepository, times(1)).save(bill);
     }

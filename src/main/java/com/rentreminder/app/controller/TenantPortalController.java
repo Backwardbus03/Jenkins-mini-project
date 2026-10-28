@@ -1,9 +1,14 @@
 package com.rentreminder.app.controller;
 
+import com.rentreminder.app.model.AppNotification;
 import com.rentreminder.app.model.Payment;
 import com.rentreminder.app.model.TenantAccount;
 import com.rentreminder.app.model.TenantInvitation;
 import com.rentreminder.app.repository.PaymentRepository;
+import com.rentreminder.app.service.NotificationService;
+import com.rentreminder.app.service.OwnerAccountService;
+import com.rentreminder.app.service.PaymentService;
+import com.rentreminder.app.service.QrCodeService;
 import com.rentreminder.app.service.TenantAccountService;
 import com.rentreminder.app.service.TenantInvitationService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -28,22 +33,25 @@ public class TenantPortalController {
     private final TenantAccountService accountService;
     private final TenantInvitationService invitationService;
     private final PaymentRepository paymentRepository;
-    private final com.rentreminder.app.service.PaymentService paymentService;
-    private final com.rentreminder.app.service.QrCodeService qrCodeService;
-    private final com.rentreminder.app.service.OwnerAccountService ownerAccountService;
+    private final PaymentService paymentService;
+    private final QrCodeService qrCodeService;
+    private final OwnerAccountService ownerAccountService;
+    private final NotificationService notificationService;
 
     public TenantPortalController(TenantAccountService accountService,
                                   TenantInvitationService invitationService,
                                   PaymentRepository paymentRepository,
-                                  com.rentreminder.app.service.PaymentService paymentService,
-                                  com.rentreminder.app.service.QrCodeService qrCodeService,
-                                  com.rentreminder.app.service.OwnerAccountService ownerAccountService) {
+                                  PaymentService paymentService,
+                                  QrCodeService qrCodeService,
+                                  OwnerAccountService ownerAccountService,
+                                  NotificationService notificationService) {
         this.accountService = accountService;
         this.invitationService = invitationService;
         this.paymentRepository = paymentRepository;
         this.paymentService = paymentService;
         this.qrCodeService = qrCodeService;
         this.ownerAccountService = ownerAccountService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping({"", "/"})
@@ -94,11 +102,13 @@ public class TenantPortalController {
         List<Payment> overduePayments = new ArrayList<>();
         List<Payment> unpaidPayments = new ArrayList<>();
         List<String> urgentReminders = new ArrayList<>();
+        List<AppNotification> tenantNotifications = new ArrayList<>();
         LocalDate today = LocalDate.now();
 
-        // For each approved lease, fetch all payment history
+        // For each approved lease, fetch payment history and notifications
         approved.forEach(invite -> {
-            var tenantPayments = paymentRepository.findByTenant(invite.getTenant());
+            var tenant = invite.getTenant();
+            var tenantPayments = paymentRepository.findByTenant(tenant);
             allPayments.addAll(tenantPayments);
 
             var tenantOverdue = tenantPayments.stream()
@@ -129,22 +139,51 @@ public class TenantPortalController {
                             }
                         }
                     });
+
+            // Fetch stored in-app notifications
+            tenantNotifications.addAll(notificationService.getNotificationsForTenant(tenant));
         });
+
+        long unreadCount = tenantNotifications.stream().filter(n -> !n.isReadStatus()).count();
 
         double totalDue = unpaidPayments.stream()
                 .filter(p -> !"Awaiting Confirmation".equalsIgnoreCase(p.getStatus()))
                 .mapToDouble(p -> p.getAmount() != null ? p.getAmount() : 0.0)
                 .sum();
 
-        model.addAttribute("account",         account);
-        model.addAttribute("pending",         pending);
-        model.addAttribute("approved",        approved);
-        model.addAttribute("allPayments",     allPayments);
-        model.addAttribute("overduePayments", overduePayments);
-        model.addAttribute("unpaidPayments",  unpaidPayments);
-        model.addAttribute("totalDue",        totalDue);
-        model.addAttribute("urgentReminders", urgentReminders);
+        model.addAttribute("account",                 account);
+        model.addAttribute("pending",                 pending);
+        model.addAttribute("approved",                approved);
+        model.addAttribute("allPayments",             allPayments);
+        model.addAttribute("overduePayments",         overduePayments);
+        model.addAttribute("unpaidPayments",          unpaidPayments);
+        model.addAttribute("totalDue",                totalDue);
+        model.addAttribute("urgentReminders",         urgentReminders);
+        model.addAttribute("notifications",           tenantNotifications);
+        model.addAttribute("unreadNotificationCount", unreadCount);
         return "portal/dashboard";
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────
+
+    @PostMapping("/notifications/{id}/read")
+    public String markNotificationRead(@PathVariable Long id) {
+        notificationService.markAsRead(id);
+        return "redirect:/portal/dashboard";
+    }
+
+    @PostMapping("/notifications/mark-all-read")
+    public String markAllNotificationsRead(Authentication auth) {
+        TenantAccount account = resolveAccount(auth);
+        if (account != null) {
+            List<TenantInvitation> approved = invitationService.getApprovedForAccount(account);
+            for (TenantInvitation inv : approved) {
+                if (inv.getTenant() != null) {
+                    notificationService.markAllAsReadForTenant(inv.getTenant());
+                }
+            }
+        }
+        return "redirect:/portal/dashboard";
     }
 
     // ── QR Code & Payment Confirmation ───────────────────────────────────
@@ -209,6 +248,20 @@ public class TenantPortalController {
 
         try {
             paymentService.markPaymentPaidByTenant(id, upiReference.trim());
+
+            // Create notification for the Owner so they see the submitted payment
+            String billLabel = payment.isElectricity() ? "Electricity Bill" : "Rent";
+            String tenantName = payment.getTenant().getName();
+            String apt = payment.getTenant().getApartmentNumber();
+            notificationService.notifyOwner(
+                    String.format("💳 Payment Submitted: Apt %s (%s)", apt, billLabel),
+                    String.format("%s submitted UPI Ref %s for %s (₹%.2f). Verification required.",
+                            tenantName, upiReference.trim(), billLabel, payment.getAmount() != null ? payment.getAmount() : 0.0),
+                    "INFO",
+                    "/payments/summary",
+                    payment
+            );
+
             redirectAttributes.addFlashAttribute("success",
                     "Payment marked as submitted! The owner will verify the UPI reference (" + upiReference.trim() + ") and update the receipt.");
         } catch (Exception e) {

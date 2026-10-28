@@ -11,7 +11,14 @@
 <!-- Navbar -->
 <nav class="navbar">
     <a class="navbar-brand" th:href="@{/portal/dashboard}">🏠 RentPortal <span style="font-size:0.7rem; opacity:0.7;">Tenant</span></a>
-    <div class="navbar-links">
+    <div class="navbar-links" style="display:flex; align-items:center; gap:0.6rem;">
+        <a href="#notifications-section" class="btn btn-sm btn-secondary" style="position:relative; display:inline-flex; align-items:center; gap:0.35rem; padding:0.35rem 0.65rem;" title="View Reminders & Notifications">
+            <span>🔔</span>
+            <span th:if="${unreadNotificationCount != null and unreadNotificationCount > 0}"
+                  class="badge badge-overdue"
+                  style="font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:999px;"
+                  th:text="${unreadNotificationCount}">1</span>
+        </a>
         <span style="color: var(--text-secondary); font-size:0.85rem;">
             Welcome, <strong th:text="${account.name}">Tenant</strong>
         </span>
@@ -35,6 +42,55 @@
              class="alert alert-error"
              style="font-size:0.95rem; font-weight:600; display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem; border-left: 4px solid var(--accent-red); box-shadow:0 4px 12px rgba(239,68,68,0.15);">
             <span th:text="${reminder}">Reminder text</span>
+        </div>
+    </div>
+
+    <!-- ══ IN-APP UI NOTIFICATIONS & REMINDERS CENTER ════════════════════ -->
+    <div id="notifications-section" th:if="${notifications != null and not #lists.isEmpty(notifications)}" style="margin-bottom: 2rem;">
+        <div class="flex-between" style="margin-bottom:0.75rem;">
+            <div class="section-title" style="margin-bottom:0; display:flex; align-items:center; gap:0.5rem;">
+                <span>🔔 In-App Reminders &amp; Alerts</span>
+                <span th:if="${unreadNotificationCount > 0}"
+                      class="badge"
+                      style="background:rgba(234,179,8,0.15); color:#facc15; border:1px solid rgba(234,179,8,0.3); font-size:0.75rem;"
+                      th:text="${unreadNotificationCount} + ' unread'">1 unread</span>
+            </div>
+            <form th:if="${unreadNotificationCount > 0}" th:action="@{/portal/notifications/mark-all-read}" method="post" style="display:inline;">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.75rem;">✓ Mark all as read</button>
+            </form>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:0.6rem;">
+            <div th:each="n : ${notifications}"
+                 class="notification-card"
+                 th:style="${n.readStatus} ? 'opacity:0.7; border-left:4px solid var(--border); padding:0.85rem 1.25rem;' : 'border-left:4px solid var(--accent-light); box-shadow:0 4px 14px rgba(99,102,241,0.15); padding:0.85rem 1.25rem; background:rgba(30,41,59,0.9);'">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem;">
+                    <div style="display:flex; gap:0.75rem; align-items:flex-start;">
+                        <span style="font-size:1.35rem; line-height:1;" th:text="${n.type == 'DANGER' ? '🚨' : (n.type == 'WARNING' ? '⚡' : (n.type == 'SUCCESS' ? '✓' : '🔔'))}">🔔</span>
+                        <div>
+                            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                                <strong style="font-size:0.95rem; color:var(--text-primary);" th:text="${n.title}">Notification Title</strong>
+                                <span th:if="${!n.readStatus}" class="badge" style="background:rgba(99,102,241,0.2); color:var(--accent-light); border:1px solid rgba(99,102,241,0.4); font-size:0.68rem; padding:0.1rem 0.4rem;">NEW</span>
+                            </div>
+                            <p style="margin:0.25rem 0 0.5rem 0; font-size:0.88rem; color:var(--text-secondary); line-height:1.4;" th:text="${n.message}">Notification message</p>
+                            <span style="font-size:0.75rem; color:var(--text-muted);"
+                                  th:text="${#temporals.format(n.createdAt, 'MMM dd, yyyy HH:mm')}">Date</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; align-items:center; flex-shrink:0;">
+                        <a th:if="${n.link != null}" th:href="@{${n.link}}" class="btn btn-sm btn-primary" style="font-size:0.78rem; padding:0.35rem 0.75rem;">
+                            Pay via UPI QR →
+                        </a>
+                        <form th:if="${!n.readStatus}" th:action="@{/portal/notifications/{id}/read(id=${n.id})}" method="post" style="display:inline;">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.78rem; padding:0.35rem 0.65rem;" title="Mark as read">
+                                ✓ Dismiss
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -146,7 +202,7 @@
     </div>
 
     <!-- ══ SECTION 2: Bills Due & QR Payment ═════════════════════════════ -->
-    <div th:if="${unpaidPayments != null and not #lists.isEmpty(unpaidPayments)}">
+    <div id="payments" th:if="${unpaidPayments != null and not #lists.isEmpty(unpaidPayments)}">
         <div class="section-title flex-between" style="margin-top:2rem;">
             <span>💡 Bills Due &amp; UPI Payment</span>
             <span style="font-size:0.95rem; font-weight:600; color:var(--accent-light);">
