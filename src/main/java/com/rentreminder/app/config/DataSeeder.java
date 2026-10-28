@@ -24,7 +24,6 @@ public class DataSeeder implements CommandLineRunner {
                 "Property Owner",
                 "owner@rentportal.com",
                 "owner123",
-                "owner@upi"
-        );
+                "sumedhhadkar@oksbi");
     }
 }
