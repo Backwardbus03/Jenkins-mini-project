@@ -6,6 +6,11 @@ pipeline {
         maven 'Maven-3'
     }
 
+    triggers {
+        githubPush()
+        pollSCM('H/2 * * * *')
+    }
+
     parameters {
         choice(name: 'DEPLOY_TARGET', choices: ['docker', 'tomcat', 'both'], description: 'Deployment platform (Docker container, Tomcat WAR, or both)')
         choice(name: 'DEPLOY_ENV', choices: ['dev', 'staging', 'prod'], description: 'Environment profile (dev, staging, prod)')
@@ -17,6 +22,9 @@ pipeline {
         string(name: 'DOCKER_REGISTRY_USER', defaultValue: '', description: 'Docker Hub username or registry namespace (e.g., your-dockerhub-username)')
         string(name: 'DOCKER_CREDENTIALS_ID', defaultValue: 'docker-hub-credentials', description: 'Jenkins Credentials ID for registry login')
         string(name: 'TOMCAT_URL', defaultValue: 'http://localhost:8080/manager/text', description: 'Tomcat Manager API URL (used when DEPLOY_TARGET is tomcat/both)')
+        booleanParam(name: 'ENABLE_EMAIL_REMINDERS', defaultValue: false, description: 'Enable scheduled background email reminder service in deployed container')
+        string(name: 'MAIL_HOST', defaultValue: 'smtp.mailtrap.io', description: 'SMTP server host for reminder emails')
+        string(name: 'MAIL_PORT', defaultValue: '2525', description: 'SMTP server port')
     }
 
     environment {
@@ -24,6 +32,9 @@ pipeline {
         IMAGE_NAME = "${params.DOCKER_IMAGE_NAME}"
         CONTAINER_NAME = "rent-portal-app"
         HOST_PORT = "${params.CONTAINER_PORT}"
+        ENABLE_EMAIL_REMINDERS = "${params.ENABLE_EMAIL_REMINDERS}"
+        MAIL_HOST = "${params.MAIL_HOST}"
+        MAIL_PORT = "${params.MAIL_PORT}"
     }
 
     stages {
@@ -43,7 +54,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                echo 'Executing Selenium Automated Regression Suite...'
+                echo 'Executing Automated Unit Tests (Electricity, QR, Reminders) & Selenium Regression Suite...'
                 // If any test fails, Maven exits with non-zero code, halting pipeline before Package, Docker Build and Deploy
                 bat 'mvn test'
             }
@@ -148,7 +159,7 @@ pipeline {
                     docker rm -f %CONTAINER_NAME% >nul 2>&1 || ver >nul
 
                     echo Starting fresh container '%CONTAINER_NAME%'...
-                    docker run -d --name %CONTAINER_NAME% -p %HOST_PORT%:8081 -v rent_data:/app/data --restart unless-stopped %IMAGE_NAME%:%EFFECTIVE_TAG%
+                    docker run -d --name %CONTAINER_NAME% -p %HOST_PORT%:8081 -v rent_data:/app/data -e REMINDER_ENABLED=%ENABLE_EMAIL_REMINDERS% -e MAIL_HOST=%MAIL_HOST% -e MAIL_PORT=%MAIL_PORT% --restart unless-stopped %IMAGE_NAME%:%EFFECTIVE_TAG%
 
                     echo Verifying active container:
                     docker ps --filter "name=%CONTAINER_NAME%"
