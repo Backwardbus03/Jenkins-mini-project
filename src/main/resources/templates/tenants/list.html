@@ -136,7 +136,7 @@
                                 </td>
                                 <td>
                                     <div>
-                                        <span class="copy-chip" th:onclick="'copyToClipboard(\'' + ${tenant.email} + '\', \'Email\')'" title="Click to copy email">
+                                        <span class="copy-chip" th:data-copy="${tenant.email}" data-label="Email" onclick="copyToClipboard(this.getAttribute('data-copy'), this.getAttribute('data-label'))" title="Click to copy email">
                                             <span th:text="${tenant.email}">john@example.com</span>
                                             <span style="font-size:0.75rem; opacity:0.6;">📋</span>
                                         </span>
@@ -197,7 +197,7 @@
                                     <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
                                         <a th:href="@{/payments/new(tenantId=${tenant.id},type='RENT')}"
                                             class="btn btn-secondary btn-sm"
-                                            style="padding:0.25rem 0.6rem; font-size:0.75rem;">+ Rent</a>
+                                            style="padding:0.25rem 0.6rem; font-size:0.75rem;">+ Add Payment</a>
                                         <a th:href="@{/payments/new(tenantId=${tenant.id},type='ELECTRICITY')}"
                                             class="btn btn-sm"
                                             style="padding:0.25rem 0.6rem; font-size:0.75rem; background:rgba(234,179,8,0.15); color:#facc15; border:1px solid rgba(234,179,8,0.3);">⚡

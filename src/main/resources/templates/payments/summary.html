@@ -152,7 +152,7 @@
                             <span th:if="${#strings.equalsIgnoreCase(p.status, 'Awaiting Confirmation')}" class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);">Awaiting Verification</span>
                         </td>
                         <td>
-                            <span th:if="${p.upiReference}" class="copy-chip" th:onclick="'copyToClipboard(\'' + ${p.upiReference} + '\', \'UPI Reference\')'" title="Click to copy UPI Reference">
+                            <span th:if="${p.upiReference}" class="copy-chip" th:data-copy="${p.upiReference}" data-label="UPI Reference" onclick="copyToClipboard(this.getAttribute('data-copy'), this.getAttribute('data-label'))" title="Click to copy UPI Reference">
                                 <code th:text="${p.upiReference}" style="font-size:0.8rem; background:rgba(0,0,0,0.3); padding:0.2rem 0.4rem; border-radius:4px;">UPI123</code>
                                 <span style="font-size:0.75rem; opacity:0.6;">📋</span>
                             </span>

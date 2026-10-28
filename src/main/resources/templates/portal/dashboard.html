@@ -99,7 +99,8 @@
                 <!-- Approve button toggles the form -->
                 <div class="flex gap-1">
                     <button class="btn btn-success btn-sm"
-                            th:onclick="'toggleApprove(\'form-' + ${invite.id} + '\')'">
+                            th:data-target="'form-' + ${invite.id}"
+                            onclick="toggleApprove(this.getAttribute('data-target'))">
                         ✓ Approve &amp; Set Deposit
                     </button>
                     <form th:action="@{/portal/invite/{id}/reject(id=${invite.id})}" method="post" style="display:inline;">
@@ -135,7 +136,8 @@
                         <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
                             <button id="btn-confirm-approve" type="submit" class="btn btn-success btn-sm">Confirm Approval</button>
                             <button type="button" class="btn btn-secondary btn-sm"
-                                    th:onclick="'toggleApprove(\'form-' + ${invite.id} + '\')'">Cancel</button>
+                                    th:data-target="'form-' + ${invite.id}"
+                                    onclick="toggleApprove(this.getAttribute('data-target'))">Cancel</button>
                         </div>
                     </form>
                 </div>
