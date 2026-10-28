@@ -8,7 +8,7 @@ pipeline {
 
     triggers {
         githubPush()
-        pollSCM('H/2 * * * *')
+
     }
 
     parameters {
@@ -41,7 +41,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Checking out the source code...'
-                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Backwardbus03/Jenkins-mini-project.git']])
+                checkout scm
             }
         }
 
