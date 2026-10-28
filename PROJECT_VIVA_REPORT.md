@@ -44,7 +44,10 @@ The **Rent Payment Reminder Portal** addresses this by coupling an end-to-end Pr
 | **Jenkins CI/CD Declarative Quality Gate** | **Implemented** | `Jenkinsfile` (Checkout $\rightarrow$ Compile $\rightarrow$ Test $\rightarrow$ Package $\rightarrow$ Docker $\rightarrow$ Deploy) |
 | **Multi-Stage & Local Docker Containerization** | **Implemented** | `Dockerfile`, `Dockerfile.local`, named volume `rent_data` |
 | **Ansible Zero-Downtime Symlink Provisioning** | **Implemented** | `ansible/site.yml`, `roles/prerequisites`, `roles/portal_release`, `rollback.yml` |
-| **Automated SMS / Email Notification Dispatch** | **Planned / Unverified** | Mentioned in SRS design concepts; currently represented via in-app alerts and invitation linkage. |
+| **Electricity Utility Billing & Meter Calculation** | **Implemented** | `Payment.java`, `PaymentService.java`, `payments/form.html` (prev/curr readings, rate, auto-calc) |
+| **Dynamic UPI QR Code Payment Generation** | **Implemented** | `QrCodeService.java` (ZXing), `TenantPortalController.java` (`/portal/payments/{id}/qr`), `dashboard.html` |
+| **Two-Step UPI Payment Verification Flow** | **Implemented** | Tenant submits UTR/ref $\rightarrow$ `Awaiting Confirmation` $\rightarrow$ Landlord one-click verification (`confirm`/`reject`) |
+| **Scheduled & On-Demand Email & In-App Reminders** | **Implemented** | `ReminderService.java` (`@Scheduled` cron dispatch, `@EnableScheduling`), in-app urgent alerts on dashboard |
 
 ### What Makes the Project Useful
 Unlike typical CRUD demonstrations, this project bridges application business logic with production DevOps engineering. It prevents bad code from ever reaching production by halting the Jenkins pipeline if any browser UI test fails, protects SQLite persistent state inside Docker named volumes, and enables sub-second system rollbacks using Linux symlink pointer switches managed by Ansible.

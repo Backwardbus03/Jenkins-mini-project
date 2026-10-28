@@ -25,22 +25,68 @@ public class PaymentService {
     }
 
     public Payment savePayment(Payment payment) {
-        if (payment.getTenant() != null && tenantInvitationService.isTenantLeaseExpired(payment.getTenant())) {
-            throw new IllegalArgumentException("Cannot record rent payment: the lease duration for this tenant has expired.");
+        if (payment.getType() == null || payment.getType().isBlank()) {
+            payment.setType("RENT");
         }
-        Optional<Payment> existing = paymentRepository.findByTenantAndMonthAndYear(
-            payment.getTenant(), payment.getMonth(), payment.getYear()
+        if (payment.getTenant() != null && tenantInvitationService.isTenantLeaseExpired(payment.getTenant())) {
+            throw new IllegalArgumentException("Cannot record payment: the lease duration for this tenant has expired.");
+        }
+
+        // Electricity calculations if applicable
+        if (payment.isElectricity()) {
+            if (payment.getPreviousReading() != null && payment.getCurrentReading() != null) {
+                if (payment.getCurrentReading() < payment.getPreviousReading()) {
+                    throw new IllegalArgumentException("Current meter reading cannot be less than previous meter reading.");
+                }
+                if (payment.getRatePerUnit() == null || payment.getRatePerUnit() <= 0) {
+                    throw new IllegalArgumentException("Rate per unit must be greater than 0.");
+                }
+                double calculatedAmount = (payment.getCurrentReading() - payment.getPreviousReading()) * payment.getRatePerUnit();
+                payment.setAmount(Math.round(calculatedAmount * 100.0) / 100.0);
+            }
+        }
+
+        if (payment.getDueDate() == null && payment.getDate() != null) {
+            payment.setDueDate(payment.getDate().plusDays(7));
+        }
+
+        Optional<Payment> existing = paymentRepository.findByTenantAndMonthAndYearAndType(
+            payment.getTenant(), payment.getMonth(), payment.getYear(), payment.getType()
         );
         if (existing.isPresent() && !existing.get().getId().equals(payment.getId())) {
-            throw new IllegalArgumentException("Payment already exists for this tenant in the specified month and year.");
+            throw new IllegalArgumentException(payment.getType() + " payment already exists for this tenant in the specified month and year.");
         }
+
         Payment saved = paymentRepository.save(payment);
 
-        // Deduct from deposit when a payment is recorded as overdue
-        if ("Overdue".equalsIgnoreCase(saved.getStatus()) && saved.getAmount() != null) {
+        // Deduct from deposit ONLY when a RENT payment is recorded as overdue
+        if ("Overdue".equalsIgnoreCase(saved.getStatus()) && saved.isRent() && saved.getAmount() != null) {
             tenantInvitationService.deductFromDeposit(saved.getTenant(), saved.getAmount());
         }
         return saved;
+    }
+
+    public Payment markPaymentPaidByTenant(Long paymentId, String upiReference) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + paymentId));
+        payment.setStatus("Awaiting Confirmation");
+        payment.setUpiReference(upiReference);
+        return paymentRepository.save(payment);
+    }
+
+    public Payment confirmPayment(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + paymentId));
+        payment.setStatus("Paid");
+        return paymentRepository.save(payment);
+    }
+
+    public Payment rejectPayment(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + paymentId));
+        payment.setStatus("Pending");
+        payment.setUpiReference(null);
+        return paymentRepository.save(payment);
     }
 
     public List<Payment> getPaymentsByTenant(Tenant tenant) {

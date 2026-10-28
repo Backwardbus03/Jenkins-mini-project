@@ -23,7 +23,8 @@ public class DataSeeder implements CommandLineRunner {
         ownerAccountService.seedDefaultOwner(
                 "Property Owner",
                 "owner@rentportal.com",
-                "owner123"
+                "owner123",
+                "owner@upi"
         );
     }
 }

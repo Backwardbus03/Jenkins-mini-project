@@ -11,7 +11,7 @@
     <a class="navbar-brand" th:href="@{/tenants}">🏠 RentPortal <span style="font-size:0.7rem; opacity:0.7;">Owner</span></a>
     <div class="navbar-links">
         <a th:href="@{/tenants}">Tenants</a>
-        <a th:href="@{/payments/new}">Add Payment</a>
+        <a th:href="@{/payments/new}">Add Payment / Bill</a>
         <a th:href="@{/payments/summary}">Summary</a>
         <form th:action="@{/logout}" method="post" style="display:inline;">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -21,13 +21,18 @@
 </nav>
 
 <div class="page-container">
+
+    <!-- Flash messages -->
+    <div th:if="${success}" class="alert alert-success">✓ <span th:text="${success}"></span></div>
+    <div th:if="${error}"   class="alert alert-error">⚠️ <span th:text="${error}"></span></div>
+
     <div class="page-header flex-between">
         <div>
-            <h1 class="page-title">Payment Summary</h1>
-            <p class="page-subtitle">All recorded payments across all tenants</p>
+            <h1 class="page-title">Payment &amp; Bill Summary</h1>
+            <p class="page-subtitle">Track rent, electricity bills, UPI payment submissions, and reminders</p>
         </div>
         <div style="display:flex; gap:0.5rem;">
-            <a th:href="@{/payments/new}" class="btn btn-primary btn-sm">+ Add Payment</a>
+            <a th:href="@{/payments/new}" class="btn btn-primary btn-sm">+ Add Payment / Bill</a>
             <a th:href="@{/payments/receipt}" class="btn btn-secondary btn-sm">🖨 Print Receipts</a>
         </div>
     </div>
@@ -38,37 +43,71 @@
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>Type</th>
                         <th>Tenant</th>
                         <th>Amount (₹)</th>
-                        <th>Date</th>
-                        <th>Month</th>
-                        <th>Year</th>
+                        <th>Bill Date</th>
+                        <th>Due Date</th>
+                        <th>Month/Yr</th>
                         <th>Status</th>
+                        <th>UPI Ref</th>
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr th:if="${#lists.isEmpty(payments)}">
-                        <td colspan="8">
+                        <td colspan="10">
                             <div class="empty-state" style="padding:2rem;">
                                 <div class="icon">💳</div>
-                                <p>No payments recorded yet. <a th:href="@{/payments/new}" style="color:var(--accent-light);">Add the first one →</a></p>
+                                <p>No bills or payments recorded yet. <a th:href="@{/payments/new}" style="color:var(--accent-light);">Add the first one →</a></p>
                             </div>
                         </td>
                     </tr>
                     <tr th:each="p : ${payments}">
                         <td class="text-muted" th:text="${p.id}">1</td>
-                        <td style="font-weight:600;" th:text="${p.tenant.name}">John Doe</td>
+                        <td>
+                            <span th:if="${p.isElectricity()}" class="badge" style="background:rgba(234,179,8,0.15); color:#facc15; border:1px solid rgba(234,179,8,0.3);">⚡ Electricity</span>
+                            <span th:unless="${p.isElectricity()}" class="badge" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">🏠 Rent</span>
+                        </td>
+                        <td style="font-weight:600;" th:text="${p.tenant.name + ' (Apt ' + p.tenant.apartmentNumber + ')'}">John Doe</td>
                         <td th:text="'₹' + ${#numbers.formatDecimal(p.amount, 1, 2)}">₹1000.00</td>
                         <td th:text="${p.date}">2024-01-01</td>
-                        <td th:text="${p.month}">1</td>
-                        <td th:text="${p.year}">2024</td>
+                        <td th:text="${p.dueDate ?: '—'}">2024-01-08</td>
+                        <td th:text="${p.month + '/' + p.year}">1/2024</td>
                         <td>
-                            <span th:class="${'badge badge-' + #strings.toLowerCase(p.status ?: 'unknown')}"
-                                  th:text="${p.status}">Paid</span>
+                            <span th:if="${#strings.equalsIgnoreCase(p.status, 'Paid')}" class="badge badge-paid">Paid</span>
+                            <span th:if="${#strings.equalsIgnoreCase(p.status, 'Overdue')}" class="badge badge-overdue">Overdue</span>
+                            <span th:if="${#strings.equalsIgnoreCase(p.status, 'Pending')}" class="badge" style="background:rgba(148,163,184,0.15); color:#94a3b8; border:1px solid rgba(148,163,184,0.3);">Pending</span>
+                            <span th:if="${#strings.equalsIgnoreCase(p.status, 'Awaiting Confirmation')}" class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);">Awaiting Verification</span>
                         </td>
                         <td>
-                            <a th:href="@{/payments/receipt/{id}(id=${p.id})}" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem; font-size:0.75rem;">🖨 Receipt</a>
+                            <code th:if="${p.upiReference}" th:text="${p.upiReference}" style="font-size:0.8rem; background:rgba(0,0,0,0.3); padding:0.2rem 0.4rem; border-radius:4px;">UPI123</code>
+                            <span th:unless="${p.upiReference}" class="text-muted">—</span>
+                        </td>
+                        <td>
+                            <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
+                                <!-- Verification Buttons for Awaiting Confirmation -->
+                                <th:block th:if="${#strings.equalsIgnoreCase(p.status, 'Awaiting Confirmation')}">
+                                    <form th:action="@{/payments/{id}/confirm(id=${p.id})}" method="post" style="display:inline;">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn btn-success btn-sm" style="padding:0.2rem 0.5rem; font-size:0.75rem;" title="Confirm receipt">✓ Confirm</button>
+                                    </form>
+                                    <form th:action="@{/payments/{id}/reject(id=${p.id})}" method="post" style="display:inline;">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn btn-danger btn-sm" style="padding:0.2rem 0.5rem; font-size:0.75rem;" title="Reject reference">✗ Reject</button>
+                                    </form>
+                                </th:block>
+
+                                <!-- Manual Reminder Button for unpaid bills -->
+                                <th:block th:if="${#strings.equalsIgnoreCase(p.status, 'Pending') or #strings.equalsIgnoreCase(p.status, 'Overdue')}">
+                                    <form th:action="@{/payments/{id}/remind(id=${p.id})}" method="post" style="display:inline;">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.75rem;" title="Send email reminder now">🔔 Remind</button>
+                                    </form>
+                                </th:block>
+
+                                <a th:href="@{/payments/receipt/{id}(id=${p.id})}" class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.75rem;">🖨 Receipt</a>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -78,4 +117,3 @@
 </div>
 </body>
 </html>
-

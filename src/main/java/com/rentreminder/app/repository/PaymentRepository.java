@@ -11,6 +11,8 @@ import java.util.Optional;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findByTenantAndMonthAndYear(Tenant tenant, Integer month, Integer year);
+    Optional<Payment> findByTenantAndMonthAndYearAndType(Tenant tenant, Integer month, Integer year, String type);
     List<Payment> findByTenant(Tenant tenant);
     List<Payment> findByTenantAndStatus(Tenant tenant, String status);
+    List<Payment> findByStatusIn(List<String> statuses);
 }

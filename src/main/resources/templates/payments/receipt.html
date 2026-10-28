@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rent Receipts — Rent Reminder Portal</title>
+    <title>Receipts — Rent Reminder Portal</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
 <body>
@@ -24,7 +24,7 @@
         <a class="navbar-brand" th:href="@{/tenants}">🏠 RentPortal <span style="font-size:0.7rem; opacity:0.7;">Owner</span></a>
         <div class="navbar-links">
             <a th:href="@{/tenants}">Tenants</a>
-            <a th:href="@{/payments/new}">Add Payment</a>
+            <a th:href="@{/payments/new}">Add Payment / Bill</a>
             <a th:href="@{/payments/summary}">Summary</a>
             <form th:action="@{/logout}" method="post" style="display:inline;">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -69,18 +69,18 @@
         <div class="receipt-doc-header">
             <div>
                 <div class="receipt-brand-title">🏠 Rent Reminder Portal</div>
-                <div class="receipt-brand-sub">Official Residential Rent Receipt &amp; Acknowledgment</div>
+                <div class="receipt-brand-sub" th:text="${p.isElectricity() ? 'Official Electricity Bill Receipt & Acknowledgment' : 'Official Residential Rent Receipt & Acknowledgment'}">Official Receipt</div>
                 <div style="font-size:0.75rem; color:#64748b; margin-top:0.25rem;">
                     Issued under Landlord-Tenant Lease Terms
                 </div>
             </div>
             <div>
-                <div class="receipt-main-title">Rent Receipt</div>
+                <div class="receipt-main-title" th:text="${p.isElectricity() ? 'Electricity Receipt' : 'Rent Receipt'}">Rent Receipt</div>
                 <div class="receipt-meta-line">
                     <strong>Receipt #:</strong> <span th:text="'REC-' + ${#numbers.formatInteger(1000 + p.id, 5)}">REC-01001</span>
                 </div>
                 <div class="receipt-meta-line">
-                    <strong>Payment ID:</strong> #<span th:text="${p.id}">1</span>
+                    <strong>Record ID:</strong> #<span th:text="${p.id}">1</span>
                 </div>
                 <div class="receipt-meta-line">
                     <strong>Date Issued:</strong> <span th:text="${p.date}">2024-01-01</span>
@@ -89,9 +89,11 @@
                     <span th:if="${#strings.equalsIgnoreCase(p.status, 'Paid')}"
                           class="receipt-stamp receipt-stamp-paid">✓ PAID IN FULL</span>
                     <span th:if="${#strings.equalsIgnoreCase(p.status, 'Overdue')}"
-                          class="receipt-stamp receipt-stamp-overdue">⚠ OVERDUE (DEPOSIT DEDUCTED)</span>
-                    <span th:if="${!#strings.equalsIgnoreCase(p.status, 'Paid') and !#strings.equalsIgnoreCase(p.status, 'Overdue')}"
-                          class="receipt-stamp receipt-stamp-paid" th:text="${p.status}">Status</span>
+                          class="receipt-stamp receipt-stamp-overdue">⚠ OVERDUE</span>
+                    <span th:if="${#strings.equalsIgnoreCase(p.status, 'Awaiting Confirmation')}"
+                          class="receipt-stamp" style="color:#d97706; border-color:#d97706;">⏳ VERIFICATION PENDING</span>
+                    <span th:if="${#strings.equalsIgnoreCase(p.status, 'Pending')}"
+                          class="receipt-stamp" style="color:#64748b; border-color:#64748b;">PENDING PAYMENT</span>
                 </div>
             </div>
         </div>
@@ -119,23 +121,26 @@
             </div>
 
             <div class="receipt-info-box">
-                <div class="receipt-info-box-title">Rental Period &amp; Transaction Details</div>
+                <div class="receipt-info-box-title">Billing Period &amp; Transaction Details</div>
                 <div class="receipt-info-line">
-                    <span class="receipt-info-label">Rental Month:</span>
+                    <span class="receipt-info-label">Bill Type:</span>
+                    <strong th:text="${p.isElectricity() ? '⚡ Electricity Utility' : '🏠 Residential Rent'}">Rent</strong>
+                </div>
+                <div class="receipt-info-line">
+                    <span class="receipt-info-label">Billing Month:</span>
                     <strong th:text="'Month ' + ${p.month} + ' of ' + ${p.year}">Month 1 of 2024</strong>
                 </div>
                 <div class="receipt-info-line">
-                    <span class="receipt-info-label">Payment Date:</span>
-                    <span th:text="${p.date}">2024-01-01</span>
+                    <span class="receipt-info-label">Due Date:</span>
+                    <span th:text="${p.dueDate ?: '—'}">2024-01-08</span>
                 </div>
                 <div class="receipt-info-line">
                     <span class="receipt-info-label">Payment Status:</span>
-                    <strong th:text="${p.status}"
-                            th:style="${#strings.equalsIgnoreCase(p.status, 'Overdue') ? 'color:#b91c1c;' : 'color:#047857;'}">Paid</strong>
+                    <strong th:text="${p.status}">Paid</strong>
                 </div>
-                <div class="receipt-info-line">
-                    <span class="receipt-info-label">Accounting Entry:</span>
-                    <span>Direct Rent Ledger</span>
+                <div class="receipt-info-line" th:if="${p.upiReference}">
+                    <span class="receipt-info-label">UPI Reference:</span>
+                    <code th:text="${p.upiReference}">412356789012</code>
                 </div>
             </div>
         </div>
@@ -153,8 +158,13 @@
             <tbody>
                 <tr>
                     <td>
-                        <strong>Monthly Residential Rent</strong><br>
+                        <strong th:if="${p.isElectricity()}">⚡ Monthly Electricity Utility Charges</strong>
+                        <strong th:unless="${p.isElectricity()}">🏠 Monthly Residential Rent</strong><br>
                         <span style="font-size:0.75rem; color:#64748b;"
+                              th:if="${p.isElectricity() and p.previousReading != null and p.currentReading != null}"
+                              th:text="'Meter Reading: ' + ${p.previousReading} + ' to ' + ${p.currentReading} + ' (' + ${#numbers.formatDecimal(p.unitsConsumed, 1, 1)} + ' kWh @ ₹' + ${p.ratePerUnit} + '/unit)'">Meter info</span>
+                        <span style="font-size:0.75rem; color:#64748b;"
+                              th:unless="${p.isElectricity()}"
                               th:text="'Apartment ' + ${p.tenant.apartmentNumber} + ' — Primary Residence'">Apartment 101</span>
                     </td>
                     <td style="text-align:center;" th:text="${p.month + ' / ' + p.year}">1 / 2024</td>
@@ -171,7 +181,7 @@
         <div class="receipt-totals">
             <div class="receipt-totals-box">
                 <div class="receipt-total-row">
-                    <span>Base Rent:</span>
+                    <span th:text="${p.isElectricity() ? 'Electricity Base:' : 'Base Rent:'}">Base:</span>
                     <span th:text="'₹' + ${#numbers.formatDecimal(p.amount, 1, 2)}">₹15,000.00</span>
                 </div>
                 <div class="receipt-total-row">
@@ -186,14 +196,14 @@
         </div>
 
         <!-- Overdue / Paid Notice -->
-        <div th:if="${#strings.equalsIgnoreCase(p.status, 'Overdue')}" class="receipt-notice receipt-notice-overdue">
+        <div th:if="${#strings.equalsIgnoreCase(p.status, 'Overdue') and p.isRent()}" class="receipt-notice receipt-notice-overdue">
             <strong>⚠️ Notice of Security Deposit Deduction:</strong><br>
             This rental payment was marked as <strong>Overdue</strong>. As per agreement terms, an amount of
             <strong th:text="'₹' + ${#numbers.formatDecimal(p.amount, 1, 2)}">₹0.00</strong> has been adjusted and deducted directly from the tenant's security deposit balance.
         </div>
         <div th:if="${#strings.equalsIgnoreCase(p.status, 'Paid')}" class="receipt-notice receipt-notice-paid">
             <strong>✓ Payment Acknowledgment:</strong><br>
-            Payment has been successfully recorded in full for the rental period stated above. Thank you for your payment.
+            Payment has been successfully recorded in full for the billing period stated above. Thank you for your payment.
         </div>
 
         <!-- Signatures & Authorization -->
@@ -213,7 +223,7 @@
         <!-- Footer -->
         <div class="receipt-footer-text">
             This document is an electronically generated official receipt issued via Rent Reminder Portal.<br>
-            Document ID: <span th:text="'RRP-SEC-' + ${p.id} + '-' + ${p.month} + ${p.year}">RRP-SEC-1</span> |
+            Document ID: <span th:text="'RRP-' + ${p.type} + '-' + ${p.id} + '-' + ${p.month} + ${p.year}">RRP-SEC-1</span> |
             Generated on: <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd HH:mm')}">2024-01-01 12:00</span>
         </div>
 

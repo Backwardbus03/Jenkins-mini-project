@@ -32,16 +32,30 @@ public class Payment {
     private Integer year;
     private String status;
 
+    private String type = "RENT"; // "RENT" or "ELECTRICITY"
+    private LocalDate dueDate;
+    private Double previousReading;
+    private Double currentReading;
+    private Double ratePerUnit;
+    private String upiReference;
+    private LocalDate lastReminderSentOn;
+
     public Payment() {
     }
 
     public Payment(Tenant tenant, Double amount, LocalDate date, Integer month, Integer year, String status) {
+        this(tenant, amount, date, month, year, status, "RENT", null);
+    }
+
+    public Payment(Tenant tenant, Double amount, LocalDate date, Integer month, Integer year, String status, String type, LocalDate dueDate) {
         this.tenant = tenant;
         this.amount = amount;
         this.date = date;
         this.month = month;
         this.year = year;
         this.status = status;
+        this.type = (type != null && !type.isBlank()) ? type : "RENT";
+        this.dueDate = dueDate;
     }
 
     public Long getId() {
@@ -98,5 +112,76 @@ public class Payment {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getType() {
+        return type != null ? type : "RENT";
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public LocalDate getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(LocalDate dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    public Double getPreviousReading() {
+        return previousReading;
+    }
+
+    public void setPreviousReading(Double previousReading) {
+        this.previousReading = previousReading;
+    }
+
+    public Double getCurrentReading() {
+        return currentReading;
+    }
+
+    public void setCurrentReading(Double currentReading) {
+        this.currentReading = currentReading;
+    }
+
+    public Double getRatePerUnit() {
+        return ratePerUnit;
+    }
+
+    public void setRatePerUnit(Double ratePerUnit) {
+        this.ratePerUnit = ratePerUnit;
+    }
+
+    public String getUpiReference() {
+        return upiReference;
+    }
+
+    public void setUpiReference(String upiReference) {
+        this.upiReference = upiReference;
+    }
+
+    public LocalDate getLastReminderSentOn() {
+        return lastReminderSentOn;
+    }
+
+    public void setLastReminderSentOn(LocalDate lastReminderSentOn) {
+        this.lastReminderSentOn = lastReminderSentOn;
+    }
+
+    public boolean isRent() {
+        return "RENT".equalsIgnoreCase(this.type);
+    }
+
+    public boolean isElectricity() {
+        return "ELECTRICITY".equalsIgnoreCase(this.type);
+    }
+
+    public Double getUnitsConsumed() {
+        if (currentReading != null && previousReading != null) {
+            return Math.max(0.0, currentReading - previousReading);
+        }
+        return null;
     }
 }

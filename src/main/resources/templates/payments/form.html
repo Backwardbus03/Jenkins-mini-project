@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Payment — Rent Reminder Portal</title>
+    <title>Record Bill / Payment — Rent Reminder Portal</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
 <body>
@@ -11,7 +11,7 @@
     <a class="navbar-brand" th:href="@{/tenants}">🏠 RentPortal <span style="font-size:0.7rem; opacity:0.7;">Owner</span></a>
     <div class="navbar-links">
         <a th:href="@{/tenants}">Tenants</a>
-        <a th:href="@{/payments/new}">Add Payment</a>
+        <a th:href="@{/payments/new}">Add Payment / Bill</a>
         <a th:href="@{/payments/summary}">Summary</a>
         <form th:action="@{/logout}" method="post" style="display:inline;">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -22,15 +22,24 @@
 
 <div class="page-container">
     <div class="page-header">
-        <h1 class="page-title">Record Payment</h1>
-        <p class="page-subtitle">Record a rent payment or mark rent as overdue</p>
+        <h1 class="page-title">Record Rent / Electricity Bill</h1>
+        <p class="page-subtitle">Issue a monthly bill for tenant UPI payment or record an immediate payment</p>
     </div>
 
-    <div class="card" style="max-width:540px;">
-        <form th:action="@{/payments}" th:object="${payment}" method="post">
+    <div class="card" style="max-width:580px;">
+        <form th:action="@{/payments}" th:object="${payment}" method="post" id="payment-form">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
             <div th:if="${#fields.hasErrors('month')}" class="alert alert-error" th:errors="*{month}"></div>
+
+            <!-- Bill Type Selector -->
+            <div class="form-group">
+                <label for="pay-type">Bill Type *</label>
+                <select id="pay-type" th:field="*{type}" class="form-control" required>
+                    <option value="RENT">🏠 Rent Payment</option>
+                    <option value="ELECTRICITY">⚡ Electricity Bill</option>
+                </select>
+            </div>
 
             <div class="form-group">
                 <label for="pay-tenant">Tenant *</label>
@@ -39,29 +48,65 @@
                     <option th:each="t : ${tenants}" th:value="${t.id}" th:text="${t.name + ' (Apt ' + t.apartmentNumber + ')'}"></option>
                 </select>
             </div>
+
+            <!-- Electricity Meter Reading Fields (visible when type is ELECTRICITY) -->
+            <div id="electricity-fields" style="display:none; padding:1rem; margin-bottom:1rem; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px;">
+                <h4 style="margin-top:0; margin-bottom:0.75rem; font-size:0.9rem; color:var(--accent-light);">⚡ Electricity Meter Readings</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pay-prev-reading">Previous Reading (kWh)</label>
+                        <input id="pay-prev-reading" type="number" step="0.01" th:field="*{previousReading}" class="form-control" placeholder="e.g. 1250.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="pay-curr-reading">Current Reading (kWh)</label>
+                        <input id="pay-curr-reading" type="number" step="0.01" th:field="*{currentReading}" class="form-control" placeholder="e.g. 1420.0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pay-rate">Rate per Unit (₹/kWh)</label>
+                        <input id="pay-rate" type="number" step="0.01" th:field="*{ratePerUnit}" class="form-control" placeholder="e.g. 9.50">
+                    </div>
+                    <div class="form-group">
+                        <label>Calculated Units</label>
+                        <input id="calc-units" type="text" class="form-control" readonly placeholder="0.00 kWh" style="background:rgba(0,0,0,0.2);">
+                    </div>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="pay-amount">Amount (₹) *</label>
                 <input id="pay-amount" type="number" step="0.01" th:field="*{amount}" class="form-control" placeholder="e.g. 15000" required>
                 <span th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" style="color:var(--accent-red); font-size:0.8rem;"></span>
             </div>
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="pay-date">Date *</label>
+                    <label for="pay-date">Bill / Payment Date *</label>
                     <input id="pay-date" type="date" th:field="*{date}" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label for="pay-status">Status *</label>
-                    <select id="pay-status" th:field="*{status}" class="form-control" required>
-                        <option value="Paid">Paid</option>
-                        <option value="Overdue">Overdue (deducts from deposit)</option>
-                    </select>
+                    <label for="pay-dueDate">Due Date *</label>
+                    <input id="pay-dueDate" type="date" th:field="*{dueDate}" class="form-control" required>
                 </div>
             </div>
+
             <div class="form-row">
+                <div class="form-group">
+                    <label for="pay-status">Status *</label>
+                    <select id="pay-status" th:field="*{status}" class="form-control" required>
+                        <option value="Pending">Pending (Issue bill for UPI payment)</option>
+                        <option value="Paid">Paid (Recorded immediately)</option>
+                        <option value="Overdue">Overdue (Rent deducts from deposit)</option>
+                    </select>
+                </div>
                 <div class="form-group">
                     <label for="pay-month">Month (1–12) *</label>
                     <input id="pay-month" type="number" min="1" max="12" th:field="*{month}" class="form-control" required>
                 </div>
+            </div>
+
+            <div class="form-row">
                 <div class="form-group">
                     <label for="pay-year">Year *</label>
                     <input id="pay-year" type="number" th:field="*{year}" class="form-control" placeholder="2024" required>
@@ -69,11 +114,11 @@
             </div>
 
             <div id="overdue-notice" style="display:none; margin-bottom:1rem; padding:0.75rem 1rem; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:10px; font-size:0.85rem; color:#fca5a5;">
-                ⚠️ Marking as <strong>Overdue</strong> will automatically deduct this amount from the tenant's deposit balance.
+                ⚠️ Marking <strong>Rent</strong> as <strong>Overdue</strong> will automatically deduct this amount from the tenant's security deposit balance.
             </div>
 
             <div style="display:flex; gap:0.75rem; margin-top:1rem;">
-                <button id="btn-save-payment" type="submit" class="btn btn-primary">Save Payment</button>
+                <button id="btn-save-payment" type="submit" class="btn btn-primary">Save Bill / Payment</button>
                 <a th:href="@{/payments/summary}" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
@@ -81,12 +126,50 @@
 </div>
 
 <script>
-document.getElementById('pay-status').addEventListener('change', function() {
-    document.getElementById('overdue-notice').style.display =
-        this.value === 'Overdue' ? 'block' : 'none';
+const typeSelect = document.getElementById('pay-type');
+const elecFields = document.getElementById('electricity-fields');
+const prevReading = document.getElementById('pay-prev-reading');
+const currReading = document.getElementById('pay-curr-reading');
+const rateInput = document.getElementById('pay-rate');
+const calcUnits = document.getElementById('calc-units');
+const amountInput = document.getElementById('pay-amount');
+const statusSelect = document.getElementById('pay-status');
+const overdueNotice = document.getElementById('overdue-notice');
+
+function updateTypeVisibility() {
+    if (typeSelect.value === 'ELECTRICITY') {
+        elecFields.style.display = 'block';
+    } else {
+        elecFields.style.display = 'none';
+    }
+}
+
+function calculateElectricity() {
+    if (typeSelect.value === 'ELECTRICITY') {
+        const prev = parseFloat(prevReading.value) || 0;
+        const curr = parseFloat(currReading.value) || 0;
+        const rate = parseFloat(rateInput.value) || 0;
+
+        if (curr >= prev && rate > 0) {
+            const units = curr - prev;
+            calcUnits.value = units.toFixed(2) + ' kWh';
+            amountInput.value = (units * rate).toFixed(2);
+        }
+    }
+}
+
+typeSelect.addEventListener('change', updateTypeVisibility);
+prevReading.addEventListener('input', calculateElectricity);
+currReading.addEventListener('input', calculateElectricity);
+rateInput.addEventListener('input', calculateElectricity);
+
+statusSelect.addEventListener('change', function() {
+    overdueNotice.style.display = (this.value === 'Overdue') ? 'block' : 'none';
 });
 
+// Default dates
 const dateInput = document.getElementById('pay-date');
+const dueDateInput = document.getElementById('pay-dueDate');
 const monthInput = document.getElementById('pay-month');
 const yearInput = document.getElementById('pay-year');
 if (dateInput && !dateInput.value) {
@@ -94,8 +177,14 @@ if (dateInput && !dateInput.value) {
     dateInput.value = today.toISOString().split('T')[0];
     if (!monthInput.value) monthInput.value = today.getMonth() + 1;
     if (!yearInput.value) yearInput.value = today.getFullYear();
+    if (dueDateInput && !dueDateInput.value) {
+        const due = new Date();
+        due.setDate(today.getDate() + 7);
+        dueDateInput.value = due.toISOString().split('T')[0];
+    }
 }
+
+updateTypeVisibility();
 </script>
 </body>
 </html>
-

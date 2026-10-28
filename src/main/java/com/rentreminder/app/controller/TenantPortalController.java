@@ -28,13 +28,22 @@ public class TenantPortalController {
     private final TenantAccountService accountService;
     private final TenantInvitationService invitationService;
     private final PaymentRepository paymentRepository;
+    private final com.rentreminder.app.service.PaymentService paymentService;
+    private final com.rentreminder.app.service.QrCodeService qrCodeService;
+    private final com.rentreminder.app.service.OwnerAccountService ownerAccountService;
 
     public TenantPortalController(TenantAccountService accountService,
                                   TenantInvitationService invitationService,
-                                  PaymentRepository paymentRepository) {
+                                  PaymentRepository paymentRepository,
+                                  com.rentreminder.app.service.PaymentService paymentService,
+                                  com.rentreminder.app.service.QrCodeService qrCodeService,
+                                  com.rentreminder.app.service.OwnerAccountService ownerAccountService) {
         this.accountService = accountService;
         this.invitationService = invitationService;
         this.paymentRepository = paymentRepository;
+        this.paymentService = paymentService;
+        this.qrCodeService = qrCodeService;
+        this.ownerAccountService = ownerAccountService;
     }
 
     @GetMapping({"", "/"})
@@ -83,6 +92,9 @@ public class TenantPortalController {
 
         List<Payment> allPayments = new ArrayList<>();
         List<Payment> overduePayments = new ArrayList<>();
+        List<Payment> unpaidPayments = new ArrayList<>();
+        List<String> urgentReminders = new ArrayList<>();
+        LocalDate today = LocalDate.now();
 
         // For each approved lease, fetch all payment history
         approved.forEach(invite -> {
@@ -94,14 +106,115 @@ public class TenantPortalController {
                     .toList();
             overduePayments.addAll(tenantOverdue);
             model.addAttribute("overduePayments_" + invite.getId(), tenantOverdue);
+
+            // Collect active bills needing payment or confirmation
+            tenantPayments.stream()
+                    .filter(p -> "Pending".equalsIgnoreCase(p.getStatus())
+                            || "Overdue".equalsIgnoreCase(p.getStatus())
+                            || "Awaiting Confirmation".equalsIgnoreCase(p.getStatus()))
+                    .forEach(p -> {
+                        unpaidPayments.add(p);
+                        if (p.getDueDate() != null && !"Paid".equalsIgnoreCase(p.getStatus())) {
+                            long days = java.time.temporal.ChronoUnit.DAYS.between(today, p.getDueDate());
+                            String billLabel = p.isElectricity() ? "Electricity bill" : "Rent";
+                            if (days < 0) {
+                                urgentReminders.add(String.format("⚠️ %s for Apt %s is OVERDUE by %d day(s) (Due: %s, Amount: ₹%.2f)",
+                                        billLabel, invite.getTenant().getApartmentNumber(), Math.abs(days), p.getDueDate(), p.getAmount()));
+                            } else if (days == 0) {
+                                urgentReminders.add(String.format("🚨 %s for Apt %s is due TODAY (Amount: ₹%.2f)",
+                                        billLabel, invite.getTenant().getApartmentNumber(), p.getAmount()));
+                            } else if (days <= 3) {
+                                urgentReminders.add(String.format("⏰ %s for Apt %s is due in %d day(s) on %s (Amount: ₹%.2f)",
+                                        billLabel, invite.getTenant().getApartmentNumber(), days, p.getDueDate(), p.getAmount()));
+                            }
+                        }
+                    });
         });
+
+        double totalDue = unpaidPayments.stream()
+                .filter(p -> !"Awaiting Confirmation".equalsIgnoreCase(p.getStatus()))
+                .mapToDouble(p -> p.getAmount() != null ? p.getAmount() : 0.0)
+                .sum();
 
         model.addAttribute("account",         account);
         model.addAttribute("pending",         pending);
         model.addAttribute("approved",        approved);
         model.addAttribute("allPayments",     allPayments);
         model.addAttribute("overduePayments", overduePayments);
+        model.addAttribute("unpaidPayments",  unpaidPayments);
+        model.addAttribute("totalDue",        totalDue);
+        model.addAttribute("urgentReminders", urgentReminders);
         return "portal/dashboard";
+    }
+
+    // ── QR Code & Payment Confirmation ───────────────────────────────────
+
+    @GetMapping("/payments/{id}/qr")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<byte[]> getPaymentQrCode(@PathVariable Long id, Authentication auth) {
+        TenantAccount account = resolveAccount(auth);
+        if (account == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Optional<Payment> opt = paymentRepository.findById(id);
+        if (opt.isEmpty()) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+        Payment payment = opt.get();
+
+        // Security check: ensure payment belongs to one of this tenant's approved leases
+        List<TenantInvitation> approved = invitationService.getApprovedForAccount(account);
+        boolean belongsToTenant = approved.stream()
+                .anyMatch(inv -> inv.getTenant().getId().equals(payment.getTenant().getId()));
+        if (!belongsToTenant) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+        }
+
+        String ownerUpi = ownerAccountService.getDefaultOwnerUpi();
+        String ownerName = ownerAccountService.getDefaultOwnerName();
+        String note = String.format("%s-%d-%d-Apt%s",
+                payment.getType(), payment.getMonth(), payment.getYear(), payment.getTenant().getApartmentNumber());
+
+        String upiUri = qrCodeService.buildUpiUri(ownerUpi, ownerName, payment.getAmount(), note);
+        byte[] qrBytes = qrCodeService.generateQrPng(upiUri, 220, 220);
+
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.IMAGE_PNG)
+                .body(qrBytes);
+    }
+
+    @PostMapping("/payments/{id}/mark-paid")
+    public String markPaid(@PathVariable Long id,
+                           @RequestParam String upiReference,
+                           Authentication auth,
+                           RedirectAttributes redirectAttributes) {
+        TenantAccount account = resolveAccount(auth);
+        if (account == null) return "redirect:/login";
+
+        Optional<Payment> opt = paymentRepository.findById(id);
+        if (opt.isEmpty()) {
+            redirectAttributes.addFlashAttribute("error", "Payment record not found.");
+            return "redirect:/portal/dashboard";
+        }
+        Payment payment = opt.get();
+
+        List<TenantInvitation> approved = invitationService.getApprovedForAccount(account);
+        boolean belongsToTenant = approved.stream()
+                .anyMatch(inv -> inv.getTenant().getId().equals(payment.getTenant().getId()));
+        if (!belongsToTenant) {
+            redirectAttributes.addFlashAttribute("error", "Unauthorized access to payment record.");
+            return "redirect:/portal/dashboard";
+        }
+
+        try {
+            paymentService.markPaymentPaidByTenant(id, upiReference.trim());
+            redirectAttributes.addFlashAttribute("success",
+                    "Payment marked as submitted! The owner will verify the UPI reference (" + upiReference.trim() + ") and update the receipt.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/portal/dashboard";
     }
 
     // ── Invitation actions ────────────────────────────────────────────────

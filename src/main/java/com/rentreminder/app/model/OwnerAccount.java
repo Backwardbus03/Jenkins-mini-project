@@ -17,6 +17,7 @@ public class OwnerAccount {
     private String name;
     private String email;
     private String passwordHash;
+    private String upiId;
 
     public OwnerAccount() {}
 
@@ -24,6 +25,13 @@ public class OwnerAccount {
         this.name = name;
         this.email = email;
         this.passwordHash = passwordHash;
+    }
+
+    public OwnerAccount(String name, String email, String passwordHash, String upiId) {
+        this.name = name;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.upiId = upiId;
     }
 
     public Long getId() { return id; }
@@ -37,4 +45,7 @@ public class OwnerAccount {
 
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+
+    public String getUpiId() { return upiId; }
+    public void setUpiId(String upiId) { this.upiId = upiId; }
 }

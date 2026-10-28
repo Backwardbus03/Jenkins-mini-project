@@ -5,6 +5,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 
+import org.springframework.scheduling.annotation.EnableScheduling;
+
 /**
  * Entry point for the Rent Payment Reminder Portal.
  * Packaged as a WAR so it can be deployed to an external Tomcat
@@ -12,6 +14,7 @@ import org.springframework.boot.web.servlet.support.SpringBootServletInitializer
  * runnable standalone during local development (mvn spring-boot:run).
  */
 @SpringBootApplication
+@EnableScheduling
 public class RentReminderApplication extends SpringBootServletInitializer {
 
     public static void main(String[] args) {

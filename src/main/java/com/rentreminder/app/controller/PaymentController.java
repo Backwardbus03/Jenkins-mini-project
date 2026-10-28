@@ -19,13 +19,16 @@ public class PaymentController {
     private final PaymentService paymentService;
     private final TenantService tenantService;
     private final TenantInvitationService tenantInvitationService;
+    private final com.rentreminder.app.service.ReminderService reminderService;
 
     public PaymentController(PaymentService paymentService,
                              TenantService tenantService,
-                             TenantInvitationService tenantInvitationService) {
+                             TenantInvitationService tenantInvitationService,
+                             com.rentreminder.app.service.ReminderService reminderService) {
         this.paymentService = paymentService;
         this.tenantService = tenantService;
         this.tenantInvitationService = tenantInvitationService;
+        this.reminderService = reminderService;
     }
 
     @GetMapping({"", "/"})
@@ -42,6 +45,13 @@ public class PaymentController {
     @GetMapping({"/new", "/form", "/add"})
     public String showPaymentForm(@RequestParam(value = "tenantId", required = false) Long tenantId, Model model) {
         Payment payment = new Payment();
+        payment.setType("RENT");
+        payment.setStatus("Pending");
+        payment.setDate(java.time.LocalDate.now());
+        payment.setDueDate(java.time.LocalDate.now().plusDays(7));
+        payment.setMonth(java.time.LocalDate.now().getMonthValue());
+        payment.setYear(java.time.LocalDate.now().getYear());
+
         if (tenantId != null) {
             tenantService.findById(tenantId).ifPresent(payment::setTenant);
         }
@@ -51,17 +61,55 @@ public class PaymentController {
     }
 
     @PostMapping({"", "/"})
-    public String savePayment(@Valid @ModelAttribute("payment") Payment payment, BindingResult bindingResult, Model model) {
+    public String savePayment(@Valid @ModelAttribute("payment") Payment payment, BindingResult bindingResult, Model model, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
             model.addAttribute("tenants", tenantInvitationService.filterActiveTenants(tenantService.getAllTenants()));
             return "payments/form";
         }
         try {
             paymentService.savePayment(payment);
+            redirectAttributes.addFlashAttribute("success", "Payment record saved successfully.");
         } catch (IllegalArgumentException e) {
             bindingResult.rejectValue("month", "error.payment", e.getMessage());
             model.addAttribute("tenants", tenantInvitationService.filterActiveTenants(tenantService.getAllTenants()));
             return "payments/form";
+        }
+        return "redirect:/payments/summary";
+    }
+
+    @PostMapping("/{id}/confirm")
+    public String confirmPayment(@PathVariable Long id, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
+        try {
+            paymentService.confirmPayment(id);
+            redirectAttributes.addFlashAttribute("success", "Payment confirmed and verified.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/payments/summary";
+    }
+
+    @PostMapping("/{id}/reject")
+    public String rejectPayment(@PathVariable Long id, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
+        try {
+            paymentService.rejectPayment(id);
+            redirectAttributes.addFlashAttribute("error", "Payment reference rejected. Returned to Pending status.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/payments/summary";
+    }
+
+    @PostMapping("/{id}/remind")
+    public String sendReminder(@PathVariable Long id, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
+        try {
+            boolean sent = reminderService.sendManualReminder(id);
+            if (sent) {
+                redirectAttributes.addFlashAttribute("success", "Reminder email sent to tenant.");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "Reminder attempted, but delivery was skipped or failed (check SMTP settings).");
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         return "redirect:/payments/summary";
     }
