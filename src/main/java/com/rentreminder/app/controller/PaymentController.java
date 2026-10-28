@@ -43,9 +43,11 @@ public class PaymentController {
     }
 
     @GetMapping({"/new", "/form", "/add"})
-    public String showPaymentForm(@RequestParam(value = "tenantId", required = false) Long tenantId, Model model) {
+    public String showPaymentForm(@RequestParam(value = "tenantId", required = false) Long tenantId,
+                                  @RequestParam(value = "type", required = false) String type,
+                                  Model model) {
         Payment payment = new Payment();
-        payment.setType("RENT");
+        payment.setType((type != null && !type.isBlank()) ? type.toUpperCase() : "RENT");
         payment.setStatus("Pending");
         payment.setDate(java.time.LocalDate.now());
         payment.setDueDate(java.time.LocalDate.now().plusDays(7));
