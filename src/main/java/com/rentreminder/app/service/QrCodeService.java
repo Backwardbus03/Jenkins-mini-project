@@ -19,15 +19,16 @@ public class QrCodeService {
      */
     public String buildUpiUri(String upiId, String payeeName, Double amount, String note) {
         String formattedAmount = String.format("%.2f", amount != null ? amount : 0.0);
-        String encName = URLEncoder.encode(payeeName != null ? payeeName : "Owner", StandardCharsets.UTF_8).replace("+", "%20");
-        String encNote = URLEncoder.encode(note != null ? note : "Rent Bill", StandardCharsets.UTF_8).replace("+", "%20");
+        String encName = URLEncoder.encode(payeeName != null ? payeeName : "Owner", StandardCharsets.UTF_8).replace("+",
+                "%20");
+        String encNote = URLEncoder.encode(note != null ? note : "Rent Bill", StandardCharsets.UTF_8).replace("+",
+                "%20");
 
         return String.format("upi://pay?pa=%s&pn=%s&am=%s&cu=INR&tn=%s",
-                upiId != null ? upiId : "owner@upi",
+                upiId != null ? upiId : "sumedhhadkar@oksbi",
                 encName,
                 formattedAmount,
-                encNote
-        );
+                encNote);
     }
 
     /**

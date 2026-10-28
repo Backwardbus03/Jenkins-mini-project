@@ -14,7 +14,7 @@ public class OwnerAccountService {
     private final PasswordEncoder passwordEncoder;
 
     public OwnerAccountService(OwnerAccountRepository ownerAccountRepository,
-                               PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder) {
         this.ownerAccountRepository = ownerAccountRepository;
         this.passwordEncoder = passwordEncoder;
     }
@@ -28,11 +28,10 @@ public class OwnerAccountService {
         Optional<OwnerAccount> existing = ownerAccountRepository.findByEmail(email);
         if (existing.isEmpty()) {
             ownerAccountRepository.save(
-                new OwnerAccount(name, email, passwordEncoder.encode(rawPassword), upiId)
-            );
+                    new OwnerAccount(name, email, passwordEncoder.encode(rawPassword), upiId));
         } else {
             OwnerAccount owner = existing.get();
-            if (owner.getUpiId() == null || owner.getUpiId().isBlank()) {
+            if (upiId != null && !upiId.isBlank() && !upiId.equals(owner.getUpiId())) {
                 owner.setUpiId(upiId);
                 ownerAccountRepository.save(owner);
             }
@@ -44,7 +43,7 @@ public class OwnerAccountService {
                 .filter(o -> o.getUpiId() != null && !o.getUpiId().isBlank())
                 .map(OwnerAccount::getUpiId)
                 .findFirst()
-                .orElse("owner@upi");
+                .orElse("sumedhhadkar@oksbi");
     }
 
     public String getDefaultOwnerName() {
