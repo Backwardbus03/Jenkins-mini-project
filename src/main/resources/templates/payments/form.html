@@ -11,7 +11,7 @@
         }
         .type-btn {
             flex: 1; padding: 0.85rem 1rem; border-radius: 12px; border: 2px solid var(--border);
-            background: rgba(255,255,255,0.03); color: var(--text-secondary); cursor: pointer;
+            background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
             font-size: 0.95rem; font-weight: 600; text-align: center; transition: all 0.2s;
             display: flex; align-items: center; justify-content: center; gap: 0.5rem;
         }
@@ -34,6 +34,7 @@
         <a th:href="@{/payments/new?type=RENT}">+ Add Rent</a>
         <a th:href="@{/payments/new?type=ELECTRICITY}" style="color:#facc15;">⚡ Add Electricity Bill</a>
         <a th:href="@{/payments/summary}">Summary</a>
+        <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" style="margin-left:0.25rem;">☀️ Light Mode</button>
         <form th:action="@{/logout}" method="post" style="display:inline;">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button type="submit" class="btn btn-sm btn-logout" style="background:none; cursor:pointer;">Sign Out</button>
@@ -43,11 +44,14 @@
 
 <div class="page-container">
     <div class="page-header">
+        <a th:href="@{/payments/summary}" style="color:var(--text-muted); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center; gap:0.3rem; margin-bottom:0.5rem;">
+            ← Back to Payment Summary
+        </a>
         <h1 class="page-title">Record Rent / Electricity Bill</h1>
         <p class="page-subtitle">Select bill type below to issue a bill for tenant UPI payment or record an immediate payment</p>
     </div>
 
-    <div class="card" style="max-width:580px;">
+    <div class="card form-card" style="max-width:580px; margin:0;">
         <form th:action="@{/payments}" th:object="${payment}" method="post" id="payment-form">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
@@ -155,6 +159,7 @@
     </div>
 </div>
 
+<script th:src="@{/js/app.js}"></script>
 <script>
 const typeInput = document.getElementById('pay-type');
 const btnRent = document.getElementById('btn-toggle-rent');

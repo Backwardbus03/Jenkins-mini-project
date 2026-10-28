@@ -44,10 +44,24 @@ public class TenantController {
             }
         }
 
+        long approvedCount = invitationsMap.values().stream()
+                .filter(i -> "APPROVED".equalsIgnoreCase(i.getStatus()) && !i.isExpired())
+                .count();
+        long pendingCount = invitationsMap.values().stream()
+                .filter(i -> "PENDING".equalsIgnoreCase(i.getStatus()))
+                .count();
+        double totalDeposits = invitationsMap.values().stream()
+                .filter(i -> "APPROVED".equalsIgnoreCase(i.getStatus()) && !i.isExpired() && i.getDepositBalance() != null)
+                .mapToDouble(TenantInvitation::getDepositBalance)
+                .sum();
+
         model.addAttribute("tenants", activeTenants);
         model.addAttribute("activeTenants", activeTenants);
         model.addAttribute("expiredTenants", expiredTenants);
         model.addAttribute("invitationsMap", invitationsMap);
+        model.addAttribute("approvedCount", approvedCount);
+        model.addAttribute("pendingCount", pendingCount);
+        model.addAttribute("totalDeposits", totalDeposits);
         return "tenants/list";
     }
 
@@ -72,4 +86,3 @@ public class TenantController {
         return "redirect:/tenants";
     }
 }
-

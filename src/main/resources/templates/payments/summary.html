@@ -13,7 +13,8 @@
         <a th:href="@{/tenants}">Tenants</a>
         <a th:href="@{/payments/new?type=RENT}">+ Add Rent</a>
         <a th:href="@{/payments/new?type=ELECTRICITY}" style="color:#facc15;">⚡ Add Electricity Bill</a>
-        <a th:href="@{/payments/summary}">Summary</a>
+        <a th:href="@{/payments/summary}" class="active">Summary</a>
+        <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" style="margin-left:0.25rem;">☀️ Light Mode</button>
         <form th:action="@{/logout}" method="post" style="display:inline;">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button type="submit" class="btn btn-sm btn-logout" style="background:none; cursor:pointer;">Sign Out</button>
@@ -24,8 +25,8 @@
 <div class="page-container">
 
     <!-- Flash messages -->
-    <div th:if="${success}" class="alert alert-success">✓ <span th:text="${success}"></span></div>
-    <div th:if="${error}"   class="alert alert-error">⚠️ <span th:text="${error}"></span></div>
+    <div th:if="${success}" class="alert alert-success"><span>✓ <span th:text="${success}"></span></span></div>
+    <div th:if="${error}"   class="alert alert-error"><span>⚠️ <span th:text="${error}"></span></span></div>
 
     <div class="page-header flex-between">
         <div>
@@ -39,18 +40,61 @@
         </div>
     </div>
 
-    <!-- Quick Filter Tabs -->
-    <div class="tab-nav" style="margin-bottom:1rem;">
-        <button id="btn-flt-all" class="tab-btn active" onclick="filterTable('all')">
-            <span>All Records</span>
-            <span class="tab-badge" th:text="${#lists.size(payments)}">0</span>
-        </button>
-        <button id="btn-flt-rent" class="tab-btn" onclick="filterTable('RENT')">
-            <span>🏠 Rent Only</span>
-        </button>
-        <button id="btn-flt-elec" class="tab-btn" onclick="filterTable('ELECTRICITY')">
-            <span>⚡ Electricity Only</span>
-        </button>
+    <!-- ══ EXECUTIVE KPI SUMMARY STRIP ══════════════════════════════════ -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-icon green">💵</div>
+            <div class="kpi-info">
+                <span class="kpi-label">Total Collected</span>
+                <span class="kpi-value" th:text="'₹' + ${#numbers.formatDecimal(totalCollected ?: 0, 1, 0)}">₹0</span>
+                <span class="kpi-subtext">Verified rent &amp; bills</span>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon indigo">⏳</div>
+            <div class="kpi-info">
+                <span class="kpi-label">Pending Collection</span>
+                <span class="kpi-value" th:text="'₹' + ${#numbers.formatDecimal(totalPending ?: 0, 1, 0)}">₹0</span>
+                <span class="kpi-subtext">Issued unpaid bills</span>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon yellow">🔍</div>
+            <div class="kpi-info">
+                <span class="kpi-label">Awaiting Verification</span>
+                <span class="kpi-value" th:text="${awaitingCount ?: 0}">0</span>
+                <span class="kpi-subtext">Tenant UPI submitted</span>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon red">⚠️</div>
+            <div class="kpi-info">
+                <span class="kpi-label">Overdue Rent</span>
+                <span class="kpi-value" th:text="'₹' + ${#numbers.formatDecimal(totalOverdue ?: 0, 1, 0)}">₹0</span>
+                <span class="kpi-subtext">Deducted from deposit</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ TABS & SEARCH TOOLBAR ═════════════════════════════════════════ -->
+    <div class="toolbar">
+        <div class="tab-nav" style="margin-bottom:0; border-bottom:none; padding-bottom:0;">
+            <button id="btn-flt-all" class="tab-btn active" onclick="filterTable('all')">
+                <span>All Records</span>
+                <span class="tab-badge" th:text="${#lists.size(payments)}">0</span>
+            </button>
+            <button id="btn-flt-rent" class="tab-btn" onclick="filterTable('RENT')">
+                <span>🏠 Rent Only</span>
+            </button>
+            <button id="btn-flt-elec" class="tab-btn" onclick="filterTable('ELECTRICITY')">
+                <span>⚡ Electricity Only</span>
+            </button>
+        </div>
+
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input id="payment-search" type="text" placeholder="Search by tenant, apartment, or UPI ref..." />
+        </div>
     </div>
 
     <div class="card">
@@ -64,7 +108,7 @@
                         <th>Amount (₹)</th>
                         <th>Bill Date</th>
                         <th>Due Date</th>
-                        <th>Month/Yr</th>
+                        <th>Period</th>
                         <th>Status</th>
                         <th>UPI Ref</th>
                         <th>Action</th>
@@ -88,8 +132,16 @@
                             <span th:if="${p.isElectricity()}" class="badge" style="background:rgba(234,179,8,0.15); color:#facc15; border:1px solid rgba(234,179,8,0.3);">⚡ Electricity</span>
                             <span th:unless="${p.isElectricity()}" class="badge" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">🏠 Rent</span>
                         </td>
-                        <td style="font-weight:600;" th:text="${p.tenant.name + ' (Apt ' + p.tenant.apartmentNumber + ')'}">John Doe</td>
-                        <td th:text="'₹' + ${#numbers.formatDecimal(p.amount, 1, 2)}">₹1000.00</td>
+                        <td>
+                            <div style="display:flex; align-items:center;">
+                                <div class="avatar-circle" th:text="${#strings.substring(p.tenant.name, 0, 1).toUpperCase()}">J</div>
+                                <div>
+                                    <div style="font-weight:700;" th:text="${p.tenant.name}">John Doe</div>
+                                    <div style="font-size:0.75rem; color:var(--text-muted);" th:text="'Apt ' + ${p.tenant.apartmentNumber}">Apt 101</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="font-weight:700;" th:text="'₹' + ${#numbers.formatDecimal(p.amount, 1, 2)}">₹1000.00</td>
                         <td th:text="${p.date}">2024-01-01</td>
                         <td th:text="${p.dueDate ?: '—'}">2024-01-08</td>
                         <td th:text="${p.month + '/' + p.year}">1/2024</td>
@@ -100,7 +152,10 @@
                             <span th:if="${#strings.equalsIgnoreCase(p.status, 'Awaiting Confirmation')}" class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);">Awaiting Verification</span>
                         </td>
                         <td>
-                            <code th:if="${p.upiReference}" th:text="${p.upiReference}" style="font-size:0.8rem; background:rgba(0,0,0,0.3); padding:0.2rem 0.4rem; border-radius:4px;">UPI123</code>
+                            <span th:if="${p.upiReference}" class="copy-chip" th:onclick="'copyToClipboard(\'' + ${p.upiReference} + '\', \'UPI Reference\')'" title="Click to copy UPI Reference">
+                                <code th:text="${p.upiReference}" style="font-size:0.8rem; background:rgba(0,0,0,0.3); padding:0.2rem 0.4rem; border-radius:4px;">UPI123</code>
+                                <span style="font-size:0.75rem; opacity:0.6;">📋</span>
+                            </span>
                             <span th:unless="${p.upiReference}" class="text-muted">—</span>
                         </td>
                         <td>
@@ -135,25 +190,32 @@
     </div>
 </div>
 
+<script th:src="@{/js/app.js}"></script>
 <script>
+let currentTypeFilter = 'all';
+
 function filterTable(filterType) {
+    currentTypeFilter = filterType;
     document.querySelectorAll('.tab-nav .tab-btn').forEach(b => b.classList.remove('active'));
     if (filterType === 'all') document.getElementById('btn-flt-all').classList.add('active');
     if (filterType === 'RENT') document.getElementById('btn-flt-rent').classList.add('active');
     if (filterType === 'ELECTRICITY') document.getElementById('btn-flt-elec').classList.add('active');
+    applyFilters();
+}
 
+function applyFilters() {
+    const query = (document.getElementById('payment-search').value || '').toLowerCase().trim();
     const rows = document.querySelectorAll('#payments-table tbody tr');
     rows.forEach(r => {
+        if (r.querySelector('.empty-state')) return;
         const type = r.getAttribute('data-type');
-        if (!type || filterType === 'all') {
-            r.style.display = '';
-        } else if (type === filterType) {
-            r.style.display = '';
-        } else {
-            r.style.display = 'none';
-        }
+        const matchesType = (currentTypeFilter === 'all' || type === currentTypeFilter);
+        const matchesQuery = !query || r.textContent.toLowerCase().includes(query);
+        r.style.display = (matchesType && matchesQuery) ? '' : 'none';
     });
 }
+
+document.getElementById('payment-search').addEventListener('input', applyFilters);
 </script>
 </body>
 </html>

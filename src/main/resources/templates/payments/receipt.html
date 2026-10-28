@@ -14,6 +14,7 @@
         <a class="navbar-brand" th:href="@{/portal/dashboard}">🏠 RentPortal <span style="font-size:0.7rem; opacity:0.7;">Tenant</span></a>
         <div class="navbar-links">
             <a th:href="@{/portal/dashboard}">Dashboard</a>
+            <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" style="margin-left:0.25rem;">☀️ Light Mode</button>
             <form th:action="@{/logout}" method="post" style="display:inline;">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <button type="submit" class="btn btn-sm btn-logout" style="background:none; cursor:pointer;">Sign Out</button>
@@ -26,6 +27,7 @@
             <a th:href="@{/tenants}">Tenants</a>
             <a th:href="@{/payments/new}">Add Payment / Bill</a>
             <a th:href="@{/payments/summary}">Summary</a>
+            <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" style="margin-left:0.25rem;">☀️ Light Mode</button>
             <form th:action="@{/logout}" method="post" style="display:inline;">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <button type="submit" class="btn btn-sm btn-logout" style="background:none; cursor:pointer;">Sign Out</button>
@@ -231,5 +233,6 @@
 
 </div>
 
+<script th:src="@{/js/app.js}"></script>
 </body>
 </html>

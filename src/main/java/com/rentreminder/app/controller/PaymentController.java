@@ -38,7 +38,29 @@ public class PaymentController {
 
     @GetMapping({"/summary", "/list"})
     public String showSummary(Model model) {
-        model.addAttribute("payments", paymentService.getAllPayments());
+        List<Payment> payments = paymentService.getAllPayments();
+        model.addAttribute("payments", payments);
+
+        double totalCollected = payments.stream()
+                .filter(p -> "Paid".equalsIgnoreCase(p.getStatus()))
+                .mapToDouble(p -> p.getAmount() != null ? p.getAmount() : 0.0)
+                .sum();
+        double totalPending = payments.stream()
+                .filter(p -> "Pending".equalsIgnoreCase(p.getStatus()))
+                .mapToDouble(p -> p.getAmount() != null ? p.getAmount() : 0.0)
+                .sum();
+        double totalOverdue = payments.stream()
+                .filter(p -> "Overdue".equalsIgnoreCase(p.getStatus()))
+                .mapToDouble(p -> p.getAmount() != null ? p.getAmount() : 0.0)
+                .sum();
+        long awaitingCount = payments.stream()
+                .filter(p -> "Awaiting Confirmation".equalsIgnoreCase(p.getStatus()))
+                .count();
+
+        model.addAttribute("totalCollected", totalCollected);
+        model.addAttribute("totalPending", totalPending);
+        model.addAttribute("totalOverdue", totalOverdue);
+        model.addAttribute("awaitingCount", awaitingCount);
         return "payments/summary";
     }
 
