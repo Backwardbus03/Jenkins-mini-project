@@ -19,7 +19,7 @@ import java.time.LocalDate;
 
 /**
  * Seeds default accounts and sample electricity/rent bills on startup.
- * Owner:  owner@rentportal.com  / owner123
+ * Owner: owner@rentportal.com / owner123
  * Tenant: tenant@rentportal.com / tenant123
  */
 @Component
@@ -55,7 +55,8 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         // Ensure default owner account exists with UPI ID
-        ownerAccountService.seedDefaultOwner("Property Owner", "owner@rentportal.com", "owner123", "sumedhhadkar@oksbi");
+        ownerAccountService.seedDefaultOwner("Property Owner", "owner@rentportal.com", "owner123",
+                "sumedhhadkar@oksbi");
 
         // Seed demo tenant and pending electricity bill if none exists
         String demoEmail = "tenant@rentportal.com";
@@ -101,12 +102,12 @@ public class DataSeeder implements CommandLineRunner {
             notificationService.notifyTenant(
                     tenant,
                     "⚡ Electricity Bill Reminder: ₹1,800.00 due soon",
-                    String.format("Your Electricity Bill for Apt 101 (Period %d/%d) of ₹1,800.00 is due on %s. Scan your UPI QR code directly on your dashboard to complete the payment.",
+                    String.format(
+                            "Your Electricity Bill for Apt 101 (Period %d/%d) of ₹1,800.00 is due on %s. Scan your UPI QR code directly on your dashboard to complete the payment.",
                             today.getMonthValue(), today.getYear(), today.plusDays(3)),
                     "WARNING",
                     "/portal/dashboard#payments",
-                    elecBill
-            );
+                    elecBill);
 
             // Seed sample past rent payment
             Payment pastRent = new Payment();

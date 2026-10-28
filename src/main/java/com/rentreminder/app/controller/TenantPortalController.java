@@ -61,18 +61,18 @@ public class TenantPortalController {
 
     // ── Registration ──────────────────────────────────────────────────────
 
-    @GetMapping({"/register", "/signup"})
+    @GetMapping({ "/register", "/signup" })
     public String showRegisterForm() {
         return "portal/register";
     }
 
-    @PostMapping({"/register", "/signup"})
+    @PostMapping({ "/register", "/signup" })
     public String register(@RequestParam String name,
-                           @RequestParam String email,
-                           @RequestParam String phone,
-                           @RequestParam String password,
-                           @RequestParam String confirmPassword,
-                           RedirectAttributes redirectAttributes) {
+            @RequestParam String email,
+            @RequestParam String phone,
+            @RequestParam String password,
+            @RequestParam String confirmPassword,
+            RedirectAttributes redirectAttributes) {
         if (!password.equals(confirmPassword)) {
             redirectAttributes.addFlashAttribute("error", "Passwords do not match.");
             return "redirect:/portal/register";
@@ -90,12 +90,13 @@ public class TenantPortalController {
 
     // ── Dashboard ─────────────────────────────────────────────────────────
 
-    @GetMapping({"/dashboard", "/home"})
+    @GetMapping({ "/dashboard", "/home" })
     public String dashboard(Authentication auth, Model model) {
         TenantAccount account = resolveAccount(auth);
-        if (account == null) return "redirect:/login";
+        if (account == null)
+            return "redirect:/login";
 
-        List<TenantInvitation> pending  = invitationService.getPendingForAccount(account);
+        List<TenantInvitation> pending = invitationService.getPendingForAccount(account);
         List<TenantInvitation> approved = invitationService.getApprovedForAccount(account);
 
         List<Payment> allPayments = new ArrayList<>();
@@ -128,14 +129,18 @@ public class TenantPortalController {
                             long days = java.time.temporal.ChronoUnit.DAYS.between(today, p.getDueDate());
                             String billLabel = p.isElectricity() ? "Electricity bill" : "Rent";
                             if (days < 0) {
-                                urgentReminders.add(String.format("⚠️ %s for Apt %s is OVERDUE by %d day(s) (Due: %s, Amount: ₹%.2f)",
-                                        billLabel, invite.getTenant().getApartmentNumber(), Math.abs(days), p.getDueDate(), p.getAmount()));
+                                urgentReminders.add(String.format(
+                                        "⚠️ %s for Apt %s is OVERDUE by %d day(s) (Due: %s, Amount: ₹%.2f)",
+                                        billLabel, invite.getTenant().getApartmentNumber(), Math.abs(days),
+                                        p.getDueDate(), p.getAmount()));
                             } else if (days == 0) {
                                 urgentReminders.add(String.format("🚨 %s for Apt %s is due TODAY (Amount: ₹%.2f)",
                                         billLabel, invite.getTenant().getApartmentNumber(), p.getAmount()));
                             } else if (days <= 3) {
-                                urgentReminders.add(String.format("⏰ %s for Apt %s is due in %d day(s) on %s (Amount: ₹%.2f)",
-                                        billLabel, invite.getTenant().getApartmentNumber(), days, p.getDueDate(), p.getAmount()));
+                                urgentReminders
+                                        .add(String.format("⏰ %s for Apt %s is due in %d day(s) on %s (Amount: ₹%.2f)",
+                                                billLabel, invite.getTenant().getApartmentNumber(), days,
+                                                p.getDueDate(), p.getAmount()));
                             }
                         }
                     });
@@ -151,15 +156,15 @@ public class TenantPortalController {
                 .mapToDouble(p -> p.getAmount() != null ? p.getAmount() : 0.0)
                 .sum();
 
-        model.addAttribute("account",                 account);
-        model.addAttribute("pending",                 pending);
-        model.addAttribute("approved",                approved);
-        model.addAttribute("allPayments",             allPayments);
-        model.addAttribute("overduePayments",         overduePayments);
-        model.addAttribute("unpaidPayments",          unpaidPayments);
-        model.addAttribute("totalDue",                totalDue);
-        model.addAttribute("urgentReminders",         urgentReminders);
-        model.addAttribute("notifications",           tenantNotifications);
+        model.addAttribute("account", account);
+        model.addAttribute("pending", pending);
+        model.addAttribute("approved", approved);
+        model.addAttribute("allPayments", allPayments);
+        model.addAttribute("overduePayments", overduePayments);
+        model.addAttribute("unpaidPayments", unpaidPayments);
+        model.addAttribute("totalDue", totalDue);
+        model.addAttribute("urgentReminders", urgentReminders);
+        model.addAttribute("notifications", tenantNotifications);
         model.addAttribute("unreadNotificationCount", unreadCount);
         return "portal/dashboard";
     }
@@ -190,10 +195,12 @@ public class TenantPortalController {
 
     @GetMapping("/payments/{id}/qr")
     @ResponseBody
-    public org.springframework.http.ResponseEntity<byte[]> getPaymentQrCode(@PathVariable Long id, Authentication auth) {
+    public org.springframework.http.ResponseEntity<byte[]> getPaymentQrCode(@PathVariable Long id,
+            Authentication auth) {
         TenantAccount account = resolveAccount(auth);
         if (account == null) {
-            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .build();
         }
 
         Optional<Payment> opt = paymentRepository.findById(id);
@@ -202,12 +209,14 @@ public class TenantPortalController {
         }
         Payment payment = opt.get();
 
-        // Security check: ensure payment belongs to one of this tenant's approved leases
+        // Security check: ensure payment belongs to one of this tenant's approved
+        // leases
         List<TenantInvitation> approved = invitationService.getApprovedForAccount(account);
         boolean belongsToTenant = approved.stream()
                 .anyMatch(inv -> inv.getTenant().getId().equals(payment.getTenant().getId()));
         if (!belongsToTenant) {
-            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                    .build();
         }
 
         String ownerUpi = ownerAccountService.getDefaultOwnerUpi();
@@ -225,11 +234,12 @@ public class TenantPortalController {
 
     @PostMapping("/payments/{id}/mark-paid")
     public String markPaid(@PathVariable Long id,
-                           @RequestParam String upiReference,
-                           Authentication auth,
-                           RedirectAttributes redirectAttributes) {
+            @RequestParam String upiReference,
+            Authentication auth,
+            RedirectAttributes redirectAttributes) {
         TenantAccount account = resolveAccount(auth);
-        if (account == null) return "redirect:/login";
+        if (account == null)
+            return "redirect:/login";
 
         Optional<Payment> opt = paymentRepository.findById(id);
         if (opt.isEmpty()) {
@@ -256,14 +266,15 @@ public class TenantPortalController {
             notificationService.notifyOwner(
                     String.format("💳 Payment Submitted: Apt %s (%s)", apt, billLabel),
                     String.format("%s submitted UPI Ref %s for %s (₹%.2f). Verification required.",
-                            tenantName, upiReference.trim(), billLabel, payment.getAmount() != null ? payment.getAmount() : 0.0),
+                            tenantName, upiReference.trim(), billLabel,
+                            payment.getAmount() != null ? payment.getAmount() : 0.0),
                     "INFO",
                     "/payments/summary",
-                    payment
-            );
+                    payment);
 
             redirectAttributes.addFlashAttribute("success",
-                    "Payment marked as submitted! The owner will verify the UPI reference (" + upiReference.trim() + ") and update the receipt.");
+                    "Payment marked as submitted! The owner will verify the UPI reference (" + upiReference.trim()
+                            + ") and update the receipt.");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
@@ -274,10 +285,10 @@ public class TenantPortalController {
 
     @PostMapping("/invite/{id}/approve")
     public String approveInvite(@PathVariable Long id,
-                                @RequestParam Double depositAmount,
-                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate rentalStartDate,
-                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate rentalEndDate,
-                                RedirectAttributes redirectAttributes) {
+            @RequestParam Double depositAmount,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate rentalStartDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate rentalEndDate,
+            RedirectAttributes redirectAttributes) {
         try {
             invitationService.approve(id, depositAmount, rentalStartDate, rentalEndDate);
             redirectAttributes.addFlashAttribute("success", "Invitation approved! Your rental is now active.");
@@ -300,10 +311,11 @@ public class TenantPortalController {
 
     // ── Receipts for Tenants ──────────────────────────────────────────────
 
-    @GetMapping({"/receipt/{id}", "/receipts/{id}"})
+    @GetMapping({ "/receipt/{id}", "/receipts/{id}" })
     public String viewReceipt(@PathVariable Long id, Authentication auth, Model model) {
         TenantAccount account = resolveAccount(auth);
-        if (account == null) return "redirect:/login";
+        if (account == null)
+            return "redirect:/login";
 
         Optional<Payment> opt = paymentRepository.findById(id);
         if (opt.isEmpty()) {
@@ -325,10 +337,11 @@ public class TenantPortalController {
         return "payments/receipt";
     }
 
-    @GetMapping({"/receipt", "/receipts"})
+    @GetMapping({ "/receipt", "/receipts" })
     public String viewAllReceipts(Authentication auth, Model model) {
         TenantAccount account = resolveAccount(auth);
-        if (account == null) return "redirect:/login";
+        if (account == null)
+            return "redirect:/login";
 
         List<TenantInvitation> approved = invitationService.getApprovedForAccount(account);
         List<Payment> allPayments = approved.stream()
@@ -344,7 +357,8 @@ public class TenantPortalController {
     // ── Helpers ───────────────────────────────────────────────────────────
 
     private TenantAccount resolveAccount(Authentication auth) {
-        if (auth == null || !auth.isAuthenticated()) return null;
+        if (auth == null || !auth.isAuthenticated())
+            return null;
         String email = auth.getName();
         Optional<TenantAccount> opt = accountService.findByEmail(email);
         return opt.orElse(null);

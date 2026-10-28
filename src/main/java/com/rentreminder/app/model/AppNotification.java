@@ -134,3 +134,4 @@ public class AppNotification {
         this.payment = payment;
     }
 }
+

@@ -83,8 +83,7 @@ class ReminderServiceTest {
                 any(),
                 eq("WARNING"),
                 eq("/portal/dashboard#payments"),
-                eq(bill)
-        );
+                eq(bill));
         assertEquals(today, bill.getLastReminderSentOn());
         verify(paymentRepository, times(1)).save(bill);
     }
@@ -111,6 +110,7 @@ class ReminderServiceTest {
     }
 
     @Test
+
     void testSendManualReminder_DispatchesUiNotificationAndUpdatesDate() {
         LocalDate today = LocalDate.now();
 
@@ -135,8 +135,7 @@ class ReminderServiceTest {
                 any(),
                 eq("WARNING"),
                 eq("/portal/dashboard#payments"),
-                eq(bill)
-        );
+                eq(bill));
         assertEquals(today, bill.getLastReminderSentOn());
         verify(paymentRepository, times(1)).save(bill);
     }

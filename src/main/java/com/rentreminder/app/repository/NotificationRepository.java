@@ -22,3 +22,4 @@ public interface NotificationRepository extends JpaRepository<AppNotification, L
 
     long countByRecipientRoleAndReadStatusFalse(String recipientRole);
 }
+

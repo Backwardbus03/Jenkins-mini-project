@@ -46,7 +46,8 @@ public class ReminderService {
 
     /**
      * Daily scheduled task to scan for due/overdue rent and electricity bills
-     * and dispatch in-app UI notifications (and optional email if SMTP is configured).
+     * and dispatch in-app UI notifications (and optional email if SMTP is
+     * configured).
      */
     @Scheduled(cron = "${app.reminder.cron:0 0 9 * * *}")
     public int processDueReminders() {
@@ -82,7 +83,8 @@ public class ReminderService {
                 // 1. Deliver primary in-app UI notification
                 dispatchUiNotification(payment, daysUntilDue);
 
-                // 2. Deliver secondary email reminder if SMTP is available (swallowing errors gracefully)
+                // 2. Deliver secondary email reminder if SMTP is available (swallowing errors
+                // gracefully)
                 sendEmailReminderQuietly(payment, daysUntilDue);
 
                 payment.setLastReminderSentOn(today);
@@ -95,7 +97,8 @@ public class ReminderService {
     }
 
     /**
-     * Trigger a single reminder on-demand (e.g. when landlord clicks 'Remind' in the UI).
+     * Trigger a single reminder on-demand (e.g. when landlord clicks 'Remind' in
+     * the UI).
      * Always creates an in-app UI notification for the tenant's portal dashboard.
      */
     public boolean sendManualReminder(Long paymentId) {
@@ -117,6 +120,7 @@ public class ReminderService {
 
         return true;
     }
+
 
     /**
      * Creates an in-app UI notification visible to the tenant on their dashboard.
@@ -189,24 +193,25 @@ public class ReminderService {
             String subject = daysUntilDue > 0
                     ? String.format("⏰ Reminder: %s Payment Due in %d Day(s)", billTypeLabel, daysUntilDue)
                     : (daysUntilDue == 0
-                    ? String.format("🚨 Due Today: %s Payment for Apt %s", billTypeLabel, payment.getTenant().getApartmentNumber())
-                    : String.format("⚠️ OVERDUE: %s Payment for Apt %s", billTypeLabel, payment.getTenant().getApartmentNumber()));
+                            ? String.format("🚨 Due Today: %s Payment for Apt %s", billTypeLabel,
+                                    payment.getTenant().getApartmentNumber())
+                            : String.format("⚠️ OVERDUE: %s Payment for Apt %s", billTypeLabel,
+                                    payment.getTenant().getApartmentNumber()));
 
             String body = String.format(
                     "Dear %s,\n\n" +
-                    "This is a reminder regarding your %s for Apartment %s.\n" +
-                    "• Amount Due: ₹%.2f\n" +
-                    "• Due Date: %s\n" +
-                    "• Status: %s\n\n" +
-                    "View and pay via UPI QR: %s/portal/dashboard\n",
+                            "This is a reminder regarding your %s for Apartment %s.\n" +
+                            "• Amount Due: ₹%.2f\n" +
+                            "• Due Date: %s\n" +
+                            "• Status: %s\n\n" +
+                            "View and pay via UPI QR: %s/portal/dashboard\n",
                     payment.getTenant().getName(),
                     billTypeLabel,
                     payment.getTenant().getApartmentNumber(),
                     payment.getAmount() != null ? payment.getAmount() : 0.0,
                     payment.getDueDate() != null ? payment.getDueDate().toString() : "Immediately",
                     payment.getStatus(),
-                    portalBaseUrl
-            );
+                    portalBaseUrl);
 
             SimpleMailMessage msg = new SimpleMailMessage();
             msg.setFrom(fromEmail);
